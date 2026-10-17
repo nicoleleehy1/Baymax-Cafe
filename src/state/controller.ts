@@ -16,6 +16,7 @@ import { SCENARIOS, type ScenarioId } from '../sim/scenarios';
 import { PROTOCOL_VERSION, type FromWorker, type ToWorker } from '../worker/protocol';
 import { jobIsFresh, planIsFresh, type JobTicket } from './freshness';
 import { useApp } from './store';
+import { LAYOUT_ID } from '../world/layout';
 
 const QUERY_COOLDOWN = 15;
 const MAX_QUERIES_PER_RUN = 2;
@@ -71,7 +72,7 @@ export class Controller {
 
   init(): void {
     if (this.transport) return;
-    const worker = new Worker(new URL('../worker/planner.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('../worker/planner.worker.ts', import.meta.url), { type: 'module', name: `layout=${LAYOUT_ID}` });
     worker.onerror = (e) => console.warn('planner worker error', e.message);
     const t: Transport = { post: (m) => worker.postMessage(m), onMessage: null };
     worker.onmessage = (ev: MessageEvent<FromWorker>) => t.onMessage?.(ev.data);
@@ -204,6 +205,7 @@ export class Controller {
       input: {
         reqId: this.latestReqId,
         epoch: eng.epoch,
+        layoutId: LAYOUT_ID,
         modelRevision: this.modelRevision,
         obs: eng.observe(),
         weights: s.model.weights,

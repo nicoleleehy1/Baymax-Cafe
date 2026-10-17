@@ -8,7 +8,8 @@ import { angleOf, sub } from '../core/vec';
 import { SCENARIOS } from '../sim/scenarios';
 import { controller } from '../state/controller';
 import { useApp } from '../state/store';
-import { AUNT_CASS, tableById } from '../world/layout';
+import { AUNT_CASS, LAYOUT_ID, tableById } from '../world/layout';
+import { LongBlockout } from './LongBlockout';
 import { BaymaxModel, type BaymaxPose } from './Baymax';
 import { Cafe } from './Cafe';
 import { lerpAngle } from './geom';
@@ -18,7 +19,11 @@ import { ReplayScene } from './Replay';
 import { TeachingPreview } from './Teaching';
 import { SimDriver } from './SimDriver';
 
-const DEFAULT_SHOT = { pos: new THREE.Vector3(1.0, 9.2, 11.6), target: new THREE.Vector3(0.2, 0, 0.4) };
+// dollhouse framing per layout: the long café is viewed from its cut-away window side
+const DEFAULT_SHOT =
+  LAYOUT_ID === 'long'
+    ? { pos: new THREE.Vector3(0.0, 14.5, 11.5), target: new THREE.Vector3(0.0, 0, 0.3) }
+    : { pos: new THREE.Vector3(1.0, 9.2, 11.6), target: new THREE.Vector3(0.2, 0, 0.4) };
 
 export function Scene() {
   return (
@@ -34,7 +39,7 @@ export function Scene() {
     >
       <SimDriver />
       <Lights />
-      <Cafe />
+      {LAYOUT_ID === 'long' ? <LongBlockout /> : <Cafe />}
       <World />
       <CameraRig />
     </Canvas>
@@ -55,14 +60,14 @@ function Lights() {
       <ambientLight intensity={0.18} color="#ffd9a8" />
       <directionalLight
         ref={sun}
-        position={[13, 8.5, 1.5]}
+        position={LAYOUT_ID === 'long' ? [3, 10, 9] : [13, 8.5, 1.5]}
         intensity={3.1}
         color="#ffdcae"
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
-        shadow-camera-left={-9}
-        shadow-camera-right={9}
+        shadow-camera-left={-11}
+        shadow-camera-right={11}
         shadow-camera-top={8}
         shadow-camera-bottom={-8}
         shadow-camera-near={1}

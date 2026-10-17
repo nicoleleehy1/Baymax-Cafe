@@ -45,6 +45,8 @@ export interface PlanInput {
   reqId: number;
   epoch: number;
   modelRevision?: number;
+  /** layout the observation came from; the worker refuses to plan on a different map */
+  layoutId?: string;
   obs: Observation;
   weights: number[];
   initialWeights: number[];

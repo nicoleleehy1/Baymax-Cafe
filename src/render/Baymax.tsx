@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { wrapAngle, type Vec2 } from '../core/vec';
+import { TRAY_ENVELOPE } from '../world/robotBody';
 import { headingToRotY } from './geom';
 import { PALETTE, limb, softMat, splineLathe } from './style/shapes';
 
@@ -50,7 +51,7 @@ const TORSO: [number, number][] = [
 ];
 const Z_SQUASH = 0.9;
 
-export const TRAY = { y: 1.12, z: 0.42, r: 0.1 };
+export const TRAY = TRAY_ENVELOPE;
 const SHOULDER = new THREE.Vector3(0.275, 1.17, 0.01);
 const UPPER = 0.27;
 const FORE = 0.26;

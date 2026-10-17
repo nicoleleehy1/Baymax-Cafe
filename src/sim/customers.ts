@@ -24,7 +24,9 @@ export type Action =
   | { type: 'sit'; seat: string; dur: number }
   | { type: 'chat'; group: string; lookAt: Vec2; dur: number }
   | { type: 'browse'; face: number; dur: number }
-  | { type: 'leave' };
+  | { type: 'leave' }
+  /** walk somewhere and disappear (e.g. into the restroom) */
+  | { type: 'exit'; to: Vec2 };
 
 export interface Look {
   shirt: string;
@@ -260,8 +262,9 @@ export function stepCustomer(c: Customer, w: CustomerWorld): void {
         if (pv.timer >= act.dur) next();
         break;
       }
+      case 'exit':
       case 'leave': {
-        if (!pv.path) startWalk(c, DOOR.outside);
+        if (!pv.path) startWalk(c, act.type === 'exit' ? act.to : DOOR.outside);
         c.state = 'leaving';
         if (follow(c, w, speed)) {
           c.state = 'gone';

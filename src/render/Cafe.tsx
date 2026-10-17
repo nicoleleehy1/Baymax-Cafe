@@ -3,16 +3,9 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { headingToRotY } from './geom';
-import {
-  AISLES,
-  BACK_SHELF,
-  COUNTER,
-  DOOR,
-  PASTRY_ISLAND,
-  PLANTS,
-  TABLES,
-  WALL,
-} from '../world/layout';
+import { BACK_SHELF, COUNTER, DOOR_RECT as DOOR, PASTRY_ISLAND, PLANTS, TABLES, WALL, CLASSIC } from '../world/layouts/classic';
+
+const AISLES = CLASSIC.aisles;
 
 const WALL_H = 3.2;
 
