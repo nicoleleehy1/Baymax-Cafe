@@ -99,7 +99,7 @@ function World() {
         <PersonModel key={`${scenarioId}-${c.id}`} look={c.look} source={liveHuman(c.id)} seed={i} />
       ))}
       <AuntCass />
-      <BaymaxModel source={liveRobot} />
+      <BaymaxModel source={liveRobotUnlessPreviewing} />
       <DeliveredCup />
       <ChatBubbles groups={scenario.groups.map((g) => g.id)} />
       {view === 'considering' && <ConsideringOverlay />}
@@ -120,6 +120,14 @@ const liveRobot = (): BaymaxPose => {
     lookAt: controller.engine.robot.lookAt,
     visible: true,
   };
+};
+
+/** While a teaching preview plays, the ghost *is* Baymax rehearsing; hide the paused body. */
+const liveRobotUnlessPreviewing = (): BaymaxPose => {
+  const p = liveRobot();
+  const rs = useApp.getState().runState;
+  p.visible = !((rs === 'teaching' || rs === 'learning') && useApp.getState().query?.query);
+  return p;
 };
 
 const liveHuman = (id: string) => (): PersonPose => {
@@ -224,13 +232,25 @@ function CameraRig() {
       const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
       const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
       const ext = Math.max(Math.max(...xs) - Math.min(...xs), (Math.max(...zs) - Math.min(...zs)) * 1.5, 4);
-      const d = 1.25 * ext + 2;
+      const d = 1.45 * ext + 2.2;
       // aim slightly below centre so the teaching card does not cover the paths
-      toT = new THREE.Vector3(cx, 0, cz + 0.12 * d);
+      toT = new THREE.Vector3(cx, 0, cz + 0.22 * d);
       toP = new THREE.Vector3(cx + 0.4, 0.78 * d + 1.5, cz + 0.62 * d + 1.2);
+      // keep Baymax's head clear of the toolbar (top ~14% of the screen): slide the shot back if needed
+      const head = new THREE.Vector3(a.pts[0].x, 2.0, a.pts[0].y);
+      const probe = (camera as THREE.PerspectiveCamera).clone();
+      for (let i = 0; i < 12; i++) {
+        probe.position.copy(toP);
+        probe.lookAt(toT);
+        probe.updateMatrixWorld();
+        const ndcY = head.clone().project(probe).y;
+        if (ndcY < 0.68) break;
+        toT.z -= 0.35;
+        toP.z -= 0.35;
+      }
     }
     anim.current = { fromP: camera.position.clone(), fromT: ctl.target.clone(), toP, toT, t: 0 };
-  }, [runState === 'teaching' || runState === 'learning', query, replayActive, camera]);
+  }, [runState === 'teaching' || runState === 'learning', query, replayActive, camera]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame((_, dt) => {
     const a = anim.current;

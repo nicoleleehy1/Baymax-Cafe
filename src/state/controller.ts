@@ -1,29 +1,47 @@
 // Glue between the authoritative simulation, the planning/learning worker, persistence and UI.
 // The render loop calls `advance(dt)`; renderers read `prevFrame`/`curFrame`/`alpha` directly.
+//
+// Every asynchronous reply is validated (see freshness.ts):
+//  - plans: scenario epoch + model revision + latest request id
+//  - learning / evaluation: outstanding job ticket (job id + epoch + model revision)
+// Loading/resetting a scenario bumps the epoch; learning or resetting preferences bumps
+// the model revision. Anything computed against an older state is dropped.
 import type { PlanResult } from '../core/types';
 import { exampleFromQuery } from '../eval/runner';
 import { createModel, isCompatible } from '../learning/model';
-import { listRuns, loadModel, saveModel, saveRun } from '../persistence/db';
+import { loadModel, saveModel, saveRun } from '../persistence/db';
 import { SIM_DT, SimEngine } from '../sim/engine';
 import type { Frame } from '../sim/metrics';
 import { SCENARIOS, type ScenarioId } from '../sim/scenarios';
 import { PROTOCOL_VERSION, type FromWorker, type ToWorker } from '../worker/protocol';
+import { jobIsFresh, planIsFresh, type JobTicket } from './freshness';
 import { useApp } from './store';
 
 const QUERY_COOLDOWN = 15;
 const MAX_QUERIES_PER_RUN = 2;
 
-class Controller {
+/** Minimal transport so tests can stand in for the Web Worker (and delay replies). */
+export interface Transport {
+  post(m: ToWorker): void;
+  onMessage: ((m: FromWorker) => void) | null;
+}
+
+export class Controller {
   engine: SimEngine;
   prevFrame: Frame;
   curFrame: Frame;
   alpha = 0;
   private acc = 0;
-  private worker: Worker | null = null;
+  private transport: Transport | null = null;
   private inFlight = false;
   private inFlightSince = 0;
+  private latestReqId = 0;
   private epochCounter = 0;
   private jobCounter = 0;
+  private learnTicket: JobTicket | null = null;
+  private evalTicket: (JobTicket & { scenarioId: ScenarioId }) | null = null;
+  /** bumped on every accepted learning update and on preference reset */
+  modelRevision = 0;
   private queriesThisRun = 0;
   private lastQueryT = -Infinity;
   private hudTimer = 0;
@@ -33,6 +51,8 @@ class Controller {
   planVersion = 0;
   /** before/after playback clock (mutable; UI polls it) */
   replay = { t: 0, duration: 0, playing: false, speed: 1 };
+  /** counters for diagnostics/tests */
+  dropped = { plans: 0, learned: 0, evaluated: 0 };
 
   constructor() {
     this.engine = this.makeEngine(useApp.getState().scenarioId);
@@ -45,20 +65,30 @@ class Controller {
     return new SimEngine(SCENARIOS[id], { mode: 'interactive', epoch: this.epochCounter, autoAssign: true, record: true });
   }
 
+  get epoch(): number {
+    return this.engine.epoch;
+  }
+
   init(): void {
-    if (this.worker) return;
-    this.worker = new Worker(new URL('../worker/planner.worker.ts', import.meta.url), { type: 'module' });
-    this.worker.onmessage = (ev: MessageEvent<FromWorker>) => this.onWorker(ev.data);
-    this.worker.onerror = (e) => console.warn('planner worker error', e.message);
+    if (this.transport) return;
+    const worker = new Worker(new URL('../worker/planner.worker.ts', import.meta.url), { type: 'module' });
+    worker.onerror = (e) => console.warn('planner worker error', e.message);
+    const t: Transport = { post: (m) => worker.postMessage(m), onMessage: null };
+    worker.onmessage = (ev: MessageEvent<FromWorker>) => t.onMessage?.(ev.data);
+    this.attach(t);
     loadModel().then((m) => {
       if (isCompatible(m)) useApp.getState().set({ model: m, modelLoaded: true });
       else useApp.getState().set({ modelLoaded: true });
     });
-    listRuns().then(() => undefined);
+  }
+
+  attach(t: Transport): void {
+    this.transport = t;
+    t.onMessage = (m) => this.onWorker(m);
   }
 
   private send(m: ToWorker): void {
-    this.worker?.postMessage(m);
+    this.transport?.post(m);
   }
 
   // ------------------------------------------------------------ scenario control
@@ -69,11 +99,15 @@ class Controller {
     this.curFrame = this.prevFrame;
     this.acc = 0;
     this.inFlight = false;
+    this.latestReqId = 0;
     this.queriesThisRun = 0;
     this.lastQueryT = -Infinity;
     this.latestPlan = null;
     this.planVersion++;
     this.pendingResume = false;
+    this.learnTicket = null; // an answer given in the previous run is dropped
+    this.evalTicket = null;
+    this.replay.playing = false;
     useApp.getState().set({
       scenarioId: id,
       runState: 'ready',
@@ -105,10 +139,17 @@ class Controller {
   }
 
   resetPreferences(): void {
+    const s = useApp.getState();
     const m = createModel();
-    useApp.getState().set({ model: m, evidence: null, evaluation: { status: 'idle' } });
+    this.modelRevision++;
+    this.learnTicket = null;
+    this.evalTicket = null;
+    const wasAsking = s.runState === 'teaching' || s.runState === 'learning';
+    s.set({ model: m, evidence: null, evaluation: { status: 'idle' }, replayActive: false, query: wasAsking ? null : s.query });
     void saveModel(m);
-    useApp.getState().say('system', 'Learned preferences reset to the initial model.', this.engine.t);
+    s.say('system', 'Learned preferences reset to the initial model.', this.engine.t);
+    if (wasAsking) this.replanAndResume();
+    else this.engine.lastPlanReqT = -Infinity; // rescore promptly with the reset model
   }
 
   // ------------------------------------------------------------ loop
@@ -133,7 +174,6 @@ class Controller {
         break;
       }
     }
-    // keep memory bounded for long interactive sessions
     if (this.engine.frames.length > 30 * 240) this.engine.frames.splice(0, this.engine.frames.length - 30 * 240);
     this.alpha = this.acc / SIM_DT;
     this.hudTimer += frameDt;
@@ -145,12 +185,13 @@ class Controller {
 
   private maybeRequestPlan(): void {
     const eng = this.engine;
-    if (this.inFlight && eng.t - this.inFlightSince > 1.0) this.inFlight = false; // lost/slow reply
+    if (this.inFlight && eng.t - this.inFlightSince > 1.0) this.inFlight = false; // lost/slow reply; a newer request supersedes it
     if (this.inFlight || !eng.needsPlan()) return;
     const s = useApp.getState();
     eng.markPlanRequested();
     this.inFlight = true;
     this.inFlightSince = eng.t;
+    this.latestReqId = eng.nextReqId();
     const allowQuery =
       SCENARIOS[s.scenarioId].allowQueries &&
       s.askEnabled &&
@@ -161,8 +202,9 @@ class Controller {
       v: PROTOCOL_VERSION,
       type: 'plan',
       input: {
-        reqId: eng.nextReqId(),
+        reqId: this.latestReqId,
         epoch: eng.epoch,
+        modelRevision: this.modelRevision,
         obs: eng.observe(),
         weights: s.model.weights,
         initialWeights: s.model.initialWeights,
@@ -173,35 +215,44 @@ class Controller {
     });
   }
 
-  private onWorker(m: FromWorker): void {
+  onWorker(m: FromWorker): void {
     if (m.v !== PROTOCOL_VERSION) return;
     const s = useApp.getState();
     switch (m.type) {
       case 'plan': {
         const res = m.result;
-        if (res.epoch !== this.engine.epoch) return; // scenario changed: stale
+        if (!planIsFresh(res, { epoch: this.engine.epoch, modelRevision: this.modelRevision, latestReqId: this.latestReqId })) {
+          this.dropped.plans++;
+          return;
+        }
         this.inFlight = false;
-        if (res.query && s.runState === 'running') {
+        if (res.query && s.runState === 'running' && this.engine.taskActive) {
           // Pause the shared scene and ask. Both previews start from this same observation.
           this.queriesThisRun++;
           this.lastQueryT = this.engine.t;
           this.engine.applyPlan(res);
           this.setPlan(res);
-          s.set({ runState: 'teaching', query: res });
+          s.set({ runState: 'teaching', query: res, evidence: null });
           s.say('baymax', res.query.prompt, this.engine.t);
           return;
         }
         if (this.engine.applyPlan(res)) {
           this.setPlan(res);
           this.drainEvents();
-          if (this.pendingResume) {
-            this.pendingResume = false;
-            s.set({ runState: 'running' });
-          }
+        }
+        if (this.pendingResume) {
+          this.pendingResume = false;
+          s.set({ runState: 'running' });
         }
         break;
       }
       case 'learned': {
+        if (!jobIsFresh(m.jobId, this.learnTicket, { epoch: this.engine.epoch, modelRevision: this.modelRevision })) {
+          this.dropped.learned++;
+          return;
+        }
+        this.learnTicket = null;
+        this.modelRevision++;
         s.set({ model: m.model });
         void saveModel(m.model);
         const q = s.query;
@@ -216,6 +267,17 @@ class Controller {
         break;
       }
       case 'evaluated': {
+        const t = this.evalTicket;
+        if (!t || !jobIsFresh(m.jobId, t, { epoch: this.engine.epoch, modelRevision: this.modelRevision }) || m.result.scenarioId !== t.scenarioId) {
+          this.dropped.evaluated++;
+          if (t && t.jobId === m.jobId) {
+            // the model changed while evaluating: the result no longer describes "after teaching"
+            this.evalTicket = null;
+            s.set({ evaluation: { status: 'idle' } });
+          }
+          return;
+        }
+        this.evalTicket = null;
         const r = m.result;
         this.replay = { t: 0, duration: Math.max(lastT(r.before.frames), lastT(r.after.frames)), playing: true, speed: 1 };
         s.set({ evaluation: { status: 'done', result: r, ms: m.ms }, replayActive: true });
@@ -234,7 +296,14 @@ class Controller {
       }
       case 'error':
         console.warn('worker error:', m.message);
-        if (m.jobId !== undefined) s.set({ evaluation: { status: 'error', error: m.message } });
+        if (m.jobId !== undefined && this.evalTicket?.jobId === m.jobId) {
+          this.evalTicket = null;
+          s.set({ evaluation: { status: 'error', error: m.message } });
+        }
+        if (m.jobId !== undefined && this.learnTicket?.jobId === m.jobId) {
+          this.learnTicket = null;
+          this.replanAndResume();
+        }
         break;
     }
   }
@@ -249,7 +318,7 @@ class Controller {
   answerQuery(choice: 'A' | 'B' | 'skip'): void {
     const s = useApp.getState();
     const q = s.query;
-    if (!q || !q.query) return;
+    if (!q || !q.query || s.runState !== 'teaching') return;
     if (choice === 'skip') {
       s.set({ query: null });
       this.replanAndResume();
@@ -257,24 +326,22 @@ class Controller {
     }
     s.set({ runState: 'learning' });
     const ex = exampleFromQuery(q, s.scenarioId, choice);
-    this.send({ v: PROTOCOL_VERSION, type: 'learn', jobId: ++this.jobCounter, model: s.model, example: ex });
+    const jobId = ++this.jobCounter;
+    this.learnTicket = { jobId, epoch: this.engine.epoch, modelRevision: this.modelRevision };
+    this.send({ v: PROTOCOL_VERSION, type: 'learn', jobId, model: s.model, example: ex });
   }
 
   private replanAndResume(): void {
     // Request a fresh plan from the same paused state with the current model, then resume.
     this.engine.lastPlanReqT = -Infinity;
     this.inFlight = false;
-    this.pendingResume = true;
-    useApp.getState().set({ runState: 'learning' });
-    this.maybeRequestPlanWhilePaused();
-  }
-
-  private maybeRequestPlanWhilePaused(): void {
     if (!this.engine.taskActive) {
       this.pendingResume = false;
       useApp.getState().set({ runState: 'running' });
       return;
     }
+    this.pendingResume = true;
+    useApp.getState().set({ runState: 'learning' });
     this.maybeRequestPlan();
   }
 
@@ -283,8 +350,10 @@ class Controller {
   evaluate(id?: ScenarioId): void {
     const s = useApp.getState();
     const scenarioId = id ?? s.scenarioId;
+    const jobId = ++this.jobCounter;
+    this.evalTicket = { jobId, epoch: this.engine.epoch, modelRevision: this.modelRevision, scenarioId };
     s.set({ evaluation: { status: 'running' } });
-    this.send({ v: PROTOCOL_VERSION, type: 'evaluate', jobId: ++this.jobCounter, scenarioId, initialWeights: s.model.initialWeights, learnedWeights: s.model.weights });
+    this.send({ v: PROTOCOL_VERSION, type: 'evaluate', jobId, scenarioId, initialWeights: s.model.initialWeights, learnedWeights: s.model.weights });
   }
 
   closeReplay(): void {

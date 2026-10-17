@@ -142,10 +142,11 @@ export function Dialogue() {
 
 // ------------------------------------------------------------------ teaching
 
-function consequence(c: CandidateSummary, ref: CandidateSummary): string[] {
+function consequence(c: CandidateSummary, ref: CandidateSummary, refKey: string): string[] {
   const out: string[] = [];
   const dt = (c.features[0] - ref.features[0]) * 3;
-  if (Math.abs(dt) > 0.15) out.push(`${dt > 0 ? '+' : '−'}${Math.abs(dt).toFixed(1)} s to the table`);
+  if (Math.abs(dt) > 0.15) out.push(`est. ${dt > 0 ? '+' : '−'}${Math.abs(dt).toFixed(1)} s vs. ${refKey}`);
+  else out.push(`about the same time as ${refKey}`);
   out.push(c.features[2] > 0.05 ? `${c.features[2].toFixed(1)} m through the conversation` : 'stays out of the conversation');
   out.push(`closest gap ${Math.max(0, c.minClearance).toFixed(2)} m`);
   return out;
@@ -154,6 +155,9 @@ function consequence(c: CandidateSummary, ref: CandidateSummary): string[] {
 export function TeachingCard() {
   const runState = useApp((s) => s.runState);
   const query = useApp((s) => s.query);
+  const focus = useApp((s) => s.previewFocus);
+  const compare = useApp((s) => s.previewCompare);
+  const set = useApp((s) => s.set);
   if (!query?.query || (runState !== 'teaching' && runState !== 'learning')) return null;
   const a = query.candidates[query.query.a];
   const b = query.candidates[query.query.b];
@@ -163,25 +167,41 @@ export function TeachingCard() {
       <div className="eyebrow">Baymax is asking</div>
       <h2>{query.query.prompt}</h2>
       <div className="options">
-        {([['A', a, b], ['B', b, a]] as const).map(([k, c, other]) => (
-          <button key={k} className="option" disabled={busy} onClick={() => controller.answerQuery(k)} style={{ borderColor: OPTION_COLORS[k] }}>
+        {([['A', a, b, 'B'], ['B', b, a, 'A']] as const).map(([k, c, other, otherKey]) => (
+          <button
+            key={k}
+            className={`option ${focus === k ? 'focused' : ''}`}
+            disabled={busy}
+            onClick={() => controller.answerQuery(k)}
+            onMouseEnter={() => set({ previewFocus: k })}
+            onMouseLeave={() => set({ previewFocus: null })}
+            onFocus={() => set({ previewFocus: k })}
+            onBlur={() => set({ previewFocus: null })}
+            style={{ borderColor: OPTION_COLORS[k] }}
+          >
             <span className="option-key" style={{ background: OPTION_COLORS[k] }}>
               {k}
             </span>
             <span className="option-body">
               <span className="option-title">{c.label}</span>
-              <span className="option-cons">{consequence(c, other).join(' · ')}</span>
+              <span className="option-cons">{consequence(c, other, otherKey).join(' · ')}</span>
             </span>
           </button>
         ))}
       </div>
       <div className="teach-foot">
         <span className="muted small">
-          Both previews start from the same paused moment. Score gap {fmt(query.query.scoreGap)} (a query heuristic, not a calibrated uncertainty).
+          Hover an option to preview it. Solid = Baymax’s next 3 s as planned; dashed = the rest of the route he intends. Times are estimates.
         </span>
-        <button className="btn ghost small" disabled={busy} onClick={() => controller.answerQuery('skip')}>
-          Either is fine
-        </button>
+        <span className="teach-actions">
+          <label className="toggle small">
+            <input type="checkbox" checked={compare} onChange={(e) => set({ previewCompare: e.target.checked })} />
+            Compare both
+          </label>
+          <button className="btn ghost small" disabled={busy} onClick={() => controller.answerQuery('skip')}>
+            Either is fine
+          </button>
+        </span>
       </div>
     </div>
   );
@@ -191,10 +211,16 @@ export function EvidenceCard() {
   const ev = useApp((s) => s.evidence);
   const set = useApp((s) => s.set);
   const replayActive = useApp((s) => s.replayActive);
-  if (!ev || replayActive) return null;
+  const runState = useApp((s) => s.runState);
+  const [open, setOpen] = useState(false);
+  // never compete with an open question
+  if (!ev || replayActive || runState === 'teaching' || runState === 'learning') return null;
   const r = ev.report;
+  const changes = FEATURES.map((f, i) => ({ f, i, d: r.weightsAfter[i] - r.weightsBefore[i] }))
+    .filter((x) => Math.abs(x.d) > 0.01)
+    .sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
   return (
-    <div className="evidence card">
+    <div className={`evidence card ${open ? 'open' : ''}`}>
       <div className="card-head">
         <div>
           <div className="eyebrow">Preference model updated</div>
@@ -206,35 +232,52 @@ export function EvidenceCard() {
           ×
         </button>
       </div>
-      <table className="mini">
-        <thead>
-          <tr>
-            <th>Feature</th>
-            <th title="features(preferred) − features(other)">Δ feature</th>
-            <th>Weight</th>
-          </tr>
-        </thead>
-        <tbody>
-          {FEATURES.map((f, i) => {
-            const dw = r.weightsAfter[i] - r.weightsBefore[i];
-            return (
-              <tr key={f.key} className={Math.abs(r.featureDiff[i]) > 0.02 || Math.abs(dw) > 0.01 ? '' : 'dim'}>
-                <td>{f.name}</td>
-                <td className="num">{signed(r.featureDiff[i])}</td>
-                <td className="num">
-                  {fmt(r.weightsBefore[i])} → <b>{fmt(r.weightsAfter[i])}</b>
-                  {!LEARNED[i] && <span className="tag">fixed</span>}
-                  {Math.abs(dw) > 0.01 && <span className={dw > 0 ? 'up' : 'down'}>{dw > 0 ? ' ▲' : ' ▼'}</span>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="evidence-foot">
-        P(your choice preferred) <b>{(r.probBefore * 100).toFixed(0)}%</b> → <b>{(r.probAfter * 100).toFixed(0)}%</b>
-        <span className="muted"> · utilities {fmt(r.rankBefore.preferred)} vs {fmt(r.rankBefore.other)} → {fmt(r.rankAfter.preferred)} vs {fmt(r.rankAfter.other)}</span>
+      <div className="evidence-summary">
+        {changes.slice(0, 2).map((x) => (
+          <span key={x.f.key} className="chg">
+            {x.f.name} {fmt(r.weightsBefore[x.i])} → <b>{fmt(r.weightsAfter[x.i])}</b> <span className={x.d > 0 ? 'up' : 'down'}>{x.d > 0 ? '▲' : '▼'}</span>
+          </span>
+        ))}
+        <span className="chg">
+          P(your choice) {(r.probBefore * 100).toFixed(0)}% → <b>{(r.probAfter * 100).toFixed(0)}%</b>
+        </span>
       </div>
+      <button className="btn ghost small inspector-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+        {open ? 'Hide details' : 'Inspect the update'}
+      </button>
+      {open && (
+        <>
+          <table className="mini">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th title="features(preferred) − features(other)">Δ feature</th>
+                <th>Weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              {FEATURES.map((f, i) => {
+                const dw = r.weightsAfter[i] - r.weightsBefore[i];
+                return (
+                  <tr key={f.key} className={Math.abs(r.featureDiff[i]) > 0.02 || Math.abs(dw) > 0.01 ? '' : 'dim'} title={f.description}>
+                    <td>{f.name}</td>
+                    <td className="num">{signed(r.featureDiff[i])}</td>
+                    <td className="num">
+                      {fmt(r.weightsBefore[i])} → <b>{fmt(r.weightsAfter[i])}</b>
+                      {!LEARNED[i] && <span className="tag">fixed</span>}
+                      {Math.abs(dw) > 0.01 && <span className={dw > 0 ? 'up' : 'down'}>{dw > 0 ? ' ▲' : ' ▼'}</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="evidence-foot muted">
+            Utilities (preferred vs other): {fmt(r.rankBefore.preferred)} vs {fmt(r.rankBefore.other)} → {fmt(r.rankAfter.preferred)} vs {fmt(r.rankAfter.other)}. Delay is fixed at 1 as the unit of
+            measure. All stored answers are refit together with regularization toward the initial weights.
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -329,7 +372,9 @@ function PlanDetails({ plan, weights, initial }: { plan: PlanResult; weights: nu
 function Legend() {
   return (
     <div className="legend">
-      <span><i style={{ background: '#37e0c8' }} />chosen</span>
+      <span><i style={{ background: '#37e0c8' }} />chosen (next 3 s)</span>
+      <span><i style={{ background: 'repeating-linear-gradient(90deg,#9ff5e7 0 4px,transparent 4px 7px)' }} />route intention</span>
+      <span><i style={{ background: '#fff1d6', outline: '1px solid #c9b79c' }} />actual movement</span>
       <span><i style={{ background: 'linear-gradient(90deg,#5b7bd5,#ffb347)' }} />candidates (low→high score)</span>
       <span><i style={{ background: '#c0392b' }} />rejected (collision)</span>
       <span><i style={{ background: '#ff6f91' }} />predicted people + uncertainty</span>

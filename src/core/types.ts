@@ -108,7 +108,11 @@ export interface ConversationZone {
 export interface PlanResult {
   reqId: number;
   epoch: number;
+  /** preference-model revision the plan was scored with */
+  modelRevision: number;
   tObs: number;
+  /** Baymax's heading at the observation (previews start from it) */
+  robotHeading: number;
   chosen: number;
   noSafe: boolean;
   candidates: CandidateSummary[];

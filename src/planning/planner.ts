@@ -44,6 +44,7 @@ export const PLAN = {
 export interface PlanInput {
   reqId: number;
   epoch: number;
+  modelRevision?: number;
   obs: Observation;
   weights: number[];
   initialWeights: number[];
@@ -265,7 +266,9 @@ export function plan(input: PlanInput): PlanResult {
   const result: PlanResult = {
     reqId: input.reqId,
     epoch: input.epoch,
+    modelRevision: input.modelRevision ?? 0,
     tObs: obs.t,
+    robotHeading: obs.robot.heading,
     chosen: -1,
     noSafe: false,
     candidates: [],
@@ -336,7 +339,8 @@ export function plan(input: PlanInput): PlanResult {
       }
       const heading = { x: Math.cos(obs.robot.heading), y: Math.sin(obs.robot.heading) };
       const back = sub(obs.robot.pos, scale(heading, 0.55));
-      if (grid.isFreePoint(back))
+      // only a real step back when nearly stopped; at speed it would just be a hard brake
+      if (len(obs.robot.vel) < 0.3 && grid.isFreePoint(back))
         push({ ...base, maneuver: 'backOff', speedFrac: 0.3, offset: 0 }, rolloutToPoint(obs.robot, route, back, 0.3, ROBOT.aYield), route);
     }
   }
@@ -409,14 +413,35 @@ export function selectQuery(r: PlanResult, obs: Observation, zones: Conversation
     if (fd < QUERY.minFeatureDistance || social < QUERY.minSocialDiff || gap > QUERY.maxGap) continue;
     if (!best || gap < best.scoreGap) best = { a: A.index, b: B.index, scoreGap: gap, featureDistance: fd, prompt: '' };
   }
-  if (best) {
-    const a = r.candidates[best.a];
-    const b = r.candidates[best.b];
-    const waitish = (c: CandidateSummary): boolean => c.meta.maneuver !== 'go' || c.meta.speedFrac < 0.5;
-    if (waitish(a) !== waitish(b)) best.prompt = 'Would you prefer that I wait here, or go around?';
-    else if (a.meta.routeKind !== b.meta.routeKind && (a.features[2] > 0.05 || b.features[2] > 0.05))
-      best.prompt = 'They appear to be in conversation. Shall I pass between them, or take the longer way around?';
-    else best.prompt = 'Which of these would you prefer?';
-  }
+  if (best) best.prompt = queryPrompt(r.candidates[best.a], r.candidates[best.b]);
   return best;
+}
+
+/** Short verb phrase for what a candidate actually does (used to word teaching questions). */
+export function describeAction(c: CandidateSummary): string {
+  const slow = c.meta.speedFrac < 0.5 ? ' slowly' : c.meta.speedFrac < 0.9 ? ' a little slower' : '';
+  switch (c.meta.maneuver) {
+    case 'yield':
+      return 'wait here';
+    case 'stepAside':
+      return `step aside to the ${c.meta.side}`;
+    case 'backOff':
+      return 'step back';
+    default:
+      break;
+  }
+  if (c.meta.routeKind === 'detour') return c.meta.routeId === 'reroute' ? `take a wider route around people${slow}` : `go around the conversation${slow}`;
+  if (c.features[2] > 0.05) return `pass between them${slow}`;
+  if (c.meta.offset !== 0) return `pass on the ${c.meta.offset > 0 ? 'right' : 'left'}${slow}`;
+  return c.meta.speedFrac >= 0.9 ? 'keep going' : `keep going${slow}`;
+}
+
+/** Teaching question worded from the two candidates' actual actions. */
+export function queryPrompt(a: CandidateSummary, b: CandidateSummary): string {
+  const pa = describeAction(a);
+  let pb = describeAction(b);
+  if (pa === pb) pb = `${pb} (the other way)`;
+  const conv = a.features[2] > 0.05 || b.features[2] > 0.05;
+  const lead = conv ? 'They appear to be in conversation. ' : '';
+  return `${lead}Would you prefer that I ${pa}, or ${pb}?`;
 }

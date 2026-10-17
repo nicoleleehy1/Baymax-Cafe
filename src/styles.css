@@ -88,10 +88,12 @@ select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 9px; b
 @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
 
 /* ---------- teaching ---------- */
-.teach { position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; width: min(720px, calc(100vw - 32px)); animation: rise 0.35s ease; }
+.teach { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 120px); overflow: auto; animation: rise 0.35s ease; z-index: 5; }
 .teach h2 { margin: 6px 0 12px; font-size: 19px; }
 .options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .option { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 12px; border-radius: 13px; border: 2px solid; background: #fff; cursor: pointer; font: inherit; transition: transform 0.1s, box-shadow 0.15s; }
+.option.focused { box-shadow: 0 0 0 3px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12); }
+.teach-actions { display: flex; gap: 10px; align-items: center; flex: none; }
 .option:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
 .option-key { width: 30px; height: 30px; border-radius: 50%; color: #fff; font-weight: 800; display: grid; place-items: center; flex: none; }
 .option-body { display: flex; flex-direction: column; gap: 3px; }
@@ -159,3 +161,13 @@ table.metrics td:first-child { font-weight: 600; }
 .screen-label { position: absolute; left: 0; top: 0; will-change: transform; }
 
 .taught { background: #2ec4b6; color: #08302c; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 800; }
+
+.evidence-summary { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12.5px; }
+.chg { background: rgba(74,52,36,0.07); border-radius: 8px; padding: 3px 8px; }
+.inspector-toggle { margin-top: 8px; padding-left: 0; }
+.evidence.open { max-height: calc(100vh - 120px); overflow: auto; }
+@media (max-width: 760px), (max-height: 720px) {
+  .options { grid-template-columns: 1fr; }
+  .teach h2 { font-size: 16px; }
+  .option { padding: 9px; }
+}

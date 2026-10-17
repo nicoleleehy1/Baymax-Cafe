@@ -45,6 +45,9 @@ export interface AppState {
   model: PreferenceModelState;
   modelLoaded: boolean;
   query: PlanResult | null;
+  /** teaching preview: pinned option (hover/selection) and comparison mode */
+  previewFocus: 'A' | 'B' | null;
+  previewCompare: boolean;
   evidence: LearningEvidence | null;
   dialogue: DialogueLine[];
   hud: Hud;
@@ -66,6 +69,8 @@ export const useApp = create<AppState>((set) => ({
   model: createModel(),
   modelLoaded: false,
   query: null,
+  previewFocus: null,
+  previewCompare: false,
   evidence: null,
   dialogue: [],
   hud: { t: 0, phase: 'waiting', label: 'Waiting for an order', speed: 0, tableId: null, latencyMs: 0, replans: 0, noSafe: false, chosenDiffersFromInitial: false, initialChoiceLabel: null },

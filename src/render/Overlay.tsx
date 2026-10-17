@@ -21,12 +21,15 @@ const C = {
   tail: new THREE.Color('#9ff5e7'),
   clear: new THREE.Color('#ffffff'),
   aisle: new THREE.Color('#a0e7ff'),
+  trail: new THREE.Color('#fff1d6'),
 };
 
 export function ConsideringOverlay({ plan: fixedPlan }: { plan?: PlanResult | null }) {
   const candGeom = useMemo(() => new THREE.BufferGeometry(), []);
   const chosenGeom = useMemo(() => new THREE.BufferGeometry(), []);
   const predGeom = useMemo(() => new THREE.BufferGeometry(), []);
+  const trailGeom = useMemo(() => new THREE.BufferGeometry(), []);
+  const trailTimer = useRef(0);
   const zoneGroup = useRef<THREE.Group>(null);
   const clearRef = useRef<THREE.Mesh>(null);
   const comfortRef = useRef<THREE.Mesh>(null);
@@ -44,7 +47,16 @@ export function ConsideringOverlay({ plan: fixedPlan }: { plan?: PlanResult | nu
     return g;
   }, []);
 
-  useFrame(() => {
+  useFrame((_, dt) => {
+    // executed movement: what Baymax actually did (from sim frames), refreshed at ~6 Hz
+    trailTimer.current += dt;
+    if (trailTimer.current > 0.16) {
+      trailTimer.current = 0;
+      const fr = controller.engine.frames;
+      const pts = [];
+      for (let i = Math.max(0, fr.length - 30 * 12); i < fr.length; i += 3) pts.push(fr[i].robot.pos);
+      if (pts.length > 1) buildRibbons(trailGeom, [{ pts, width: 0.03, color: C.trail, y: 0.028 }]);
+    }
     const plan = fixedPlan ?? controller.latestPlan;
     const version = fixedPlan ? -2 : controller.planVersion;
     // clearance rings follow the interpolated robot each frame
@@ -131,6 +143,7 @@ export function ConsideringOverlay({ plan: fixedPlan }: { plan?: PlanResult | nu
     <group renderOrder={10}>
       <mesh geometry={staticRibbons} material={ribbonMat} />
       <group ref={zoneGroup} />
+      <mesh geometry={trailGeom} material={strongMat} />
       <mesh geometry={candGeom} material={ribbonMat} />
       <mesh geometry={predGeom} material={strongMat} />
       <mesh geometry={chosenGeom} material={strongMat} />
