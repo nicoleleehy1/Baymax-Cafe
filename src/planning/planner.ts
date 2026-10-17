@@ -394,7 +394,8 @@ export const QUERY = { maxGap: 1.2, minFeatureDistance: 0.3, minSocialDiff: 0.25
  */
 export function selectQuery(r: PlanResult, obs: Observation, zones: ConversationZone[]): QueryPair | null {
   const nearSocial =
-    zones.some((z) => dist(z.centroid, obs.robot.pos) < QUERY.socialRange) || obs.humans.some((h) => dist(h.pos, obs.robot.pos) < 2.5);
+    zones.some((z) => dist(z.centroid, obs.robot.pos) < QUERY.socialRange) ||
+    obs.humans.some((h) => len(h.vel) > 0.3 && dist(h.pos, obs.robot.pos) < 2.5); // seated neighbours alone are not a decision
   if (!nearSocial) return null;
   const A = r.candidates[r.chosen];
   const classOf = (c: CandidateSummary): string => `${c.meta.routeId}|${c.meta.maneuver}|${c.label.split(',')[0].replace(' slowly', '')}`;
@@ -406,6 +407,7 @@ export function selectQuery(r: PlanResult, obs: Observation, zones: Conversation
     if (!cur || c.utility > cur.utility) bestByClass.set(k, c);
   }
   let best: QueryPair | null = null;
+  let bestValue = -Infinity;
   for (const [k, B] of bestByClass) {
     if (k === classOf(A)) continue;
     let fd = 0;
@@ -413,7 +415,12 @@ export function selectQuery(r: PlanResult, obs: Observation, zones: Conversation
     const social = Math.abs(A.features[1] - B.features[1]) + Math.abs(A.features[2] - B.features[2]) + Math.abs(A.features[3] - B.features[3]) + Math.abs(A.features[4] - B.features[4]);
     const gap = A.utility - B.utility;
     if (fd < QUERY.minFeatureDistance || social < QUERY.minSocialDiff || gap > QUERY.maxGap) continue;
-    if (!best || gap < best.scoreGap) best = { a: A.index, b: B.index, scoreGap: gap, featureDistance: fd, prompt: '' };
+    // prefer the alternative whose social consequences differ most for a given score gap
+    const value = social / (0.3 + Math.max(0, gap));
+    if (!best || value > bestValue) {
+      best = { a: A.index, b: B.index, scoreGap: gap, featureDistance: fd, prompt: '' };
+      bestValue = value;
+    }
   }
   if (best) best.prompt = queryPrompt(r.candidates[best.a], r.candidates[best.b]);
   return best;

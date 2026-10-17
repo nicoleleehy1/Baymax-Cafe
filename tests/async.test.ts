@@ -9,6 +9,7 @@ import { SimEngine, SIM_DT } from '../src/sim/engine';
 import { SCENARIOS } from '../src/sim/scenarios';
 import { Controller, type Transport } from '../src/state/controller';
 import { useApp } from '../src/state/store';
+import { LAYOUT_ID } from '../src/world/layout';
 import { handleMessage } from '../src/worker/handler';
 import type { FromWorker, ToWorker } from '../src/worker/protocol';
 
@@ -222,7 +223,8 @@ describe('teaching preview timing', () => {
     expect(back).toBeUndefined(); // not offered while moving at speed (it would only be braking)
   });
 
-  it('step back (offered when nearly stopped) moves backward while facing forward', () => {
+  // uses classic-café coordinates
+  it.skipIf(LAYOUT_ID !== 'classic')('step back (offered when nearly stopped) moves backward while facing forward', () => {
     const obs = { t: 0, robot: { pos: { x: 0.5, y: -0.5 }, vel: { x: 0, y: 0 }, heading: Math.PI / 2 }, goal: { x: 4.7, y: 1.4 }, humans: [], groups: [] };
     const w = createModel().weights;
     const res = plan({ reqId: 1, epoch: 0, obs, weights: w, initialWeights: w, prev: null, stuckFor: 0, allowQuery: false });

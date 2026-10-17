@@ -121,7 +121,7 @@ export function buildRoutes(req: RouteRequest): Route[] {
   // Skirt all conversation areas the direct route passes through (soft cost on zone cells).
   const crossed = req.zones.filter((z) => metersInZones(direct.pts, [z]) > 0.01 || nearPolyline(direct.pts, z, 0.35));
   if (crossed.length > 0) {
-    const pad = 0.6;
+    const pad = 0.4;
     const pts = grid.findPath(req.start, req.goal, (p) => {
       for (const z of crossed) if (inZone(p, z, pad)) return 25;
       return 0;

@@ -1,117 +1,228 @@
-// Long, narrow café adapted from the reference first-floor plan.
+// Long café traced from Nicole's first-floor reference plan (Lucky Cat Café).
 //
-// Orientation: the plan's back (kitchen) is at −x (screen left), the plan's front window
-// wall + angled entrance at +x (screen right). The plan's left wall (galley + long pastry
-// counter) is the far side (−y); the plan's right wall (window booths, communal table) is
-// the near side (+y), cut away in the dollhouse view.
+// Positions are measured on the plan image (px) and mapped to meters with piecewise-linear
+// scales: furniture keeps real-world sizes, while aisles are widened just enough for Baymax's
+// 1.04 m carrying envelope. The plan's arrangement and proportions are preserved.
+//
+// Orientation in the 3D scene: plan top (kitchen) = −x (screen left), plan bottom (front
+// window + angled door) = +x, plan left wall (galley) = −y (far side), plan right wall
+// (window booths, communal table) = +y (near side, cut away in the dollhouse view).
 import { v, type Vec2 } from '../../core/vec';
-import { polygonWallClearance, roundTable, type CircleObstacle, type LayoutDef, type Obstacle, type RectObstacle, type Seat, type Table } from '../layoutTypes';
+import { polygonWallClearance, type CircleObstacle, type LayoutDef, type Obstacle, type RectObstacle, type Seat, type Table } from '../layoutTypes';
 
-export const LONG_DIM = { x0: -8.5, x1: 8.5, y0: -4, y1: 4, kitchenX: -6.6, counterY: -2.6 };
-const { x0, x1, y0, y1 } = LONG_DIM;
+// ---------------------------------------------------------------- plan → meters
+const pwl = (pts: [number, number][]) => (p: number): number => {
+  if (p <= pts[0][0]) return pts[0][1] + (p - pts[0][0]) * ((pts[1][1] - pts[0][1]) / (pts[1][0] - pts[0][0]));
+  for (let i = 1; i < pts.length; i++) {
+    const [a, A] = pts[i - 1];
+    const [b, B] = pts[i];
+    if (p <= b) return A + ((p - a) / (b - a)) * (B - A);
+  }
+  const [a, A] = pts[pts.length - 2];
+  const [b, B] = pts[pts.length - 1];
+  return B + (p - b) * ((B - A) / (b - a));
+};
+// plan y (px, top→bottom) → depth along the café (m)
+// (the ordering area below the counter's top arm is opened up by ~1 m so a pair can stand and talk there)
+const depth = pwl([[150, 0], [465, 3.6], [495, 3.9], [615, 4.85], [705, 5.7], [760, 7.15], [837, 8.45], [895, 9.05], [953, 9.75], [1010, 10.75], [1075, 11.5], [1178, 12.55], [1325, 14.45], [1395, 15.15], [1525, 17.1]]);
+// plan x (px, left→right) → width across the café (m)
+// (aisles get extra room: seated customers' bodies stick out past their chairs)
+const across = pwl([[35, 0], [215, 2.2], [290, 3.0], [385, 3.8], [470, 5.7], [535, 6.36], [600, 7.02], [655, 9.05], [722, 9.77], [790, 10.42], [810, 10.72]]);
+const L = depth(1525);
+const Wd = across(810);
+/** plan pixel → world floor point (centred on the room) */
+export const P = (px: number, py: number): Vec2 => v(depth(py) - L / 2, across(px) - Wd / 2);
 
-// angled front-right entrance: the corner (x1, y1) is cut diagonally
-const CUT_A = v(7.0, y1);
-const CUT_B = v(x1, 2.5);
-const DOOR_A = v(7.42, 3.58);
-const DOOR_B = v(8.08, 2.92);
-const OUT = { x: 0.7071, y: 0.7071 };
+const x0 = -L / 2;
+const x1 = L / 2;
+const y0 = -Wd / 2;
+const y1 = Wd / 2;
+export const LONG_DIM = { x0, x1, y0, y1 };
 
-const boundary: Vec2[] = [v(x0, y0), v(x1, y0), CUT_B, CUT_A, v(x0, y1)];
-const porch: Vec2[] = [DOOR_A, DOOR_B, v(DOOR_B.x + OUT.x * 1.0, DOOR_B.y + OUT.y * 1.0), v(DOOR_A.x + OUT.x * 1.0, DOOR_A.y + OUT.y * 1.0)];
-const walls = [
+const rect = (id: string, visual: RectObstacle['visual'], a: Vec2, b: Vec2): RectObstacle => ({
+  kind: 'rect',
+  id,
+  visual,
+  min: v(Math.min(a.x, b.x), Math.min(a.y, b.y)),
+  max: v(Math.max(a.x, b.x), Math.max(a.y, b.y)),
+});
+/** rect of real size (sx along the café, sy across) centred on a plan point */
+const box = (id: string, visual: RectObstacle['visual'], c: Vec2, sx: number, sy: number): RectObstacle => rect(id, visual, v(c.x - sx / 2, c.y - sy / 2), v(c.x + sx / 2, c.y + sy / 2));
+const circ = (id: string, visual: CircleObstacle['visual'], c: Vec2, r: number, facing?: number): CircleObstacle => ({ kind: 'circle', id, visual, c, r, facing });
+const at = (c: Vec2, dx: number, dy: number): Vec2 => v(c.x + dx, c.y + dy);
+
+// ---------------------------------------------------------------- walls
+// angled entrance at the front-right corner
+const CUT_A = P(708, 1525);
+const CUT_B = P(810, 1392);
+const DOOR_A = at(CUT_A, (CUT_B.x - CUT_A.x) * 0.22, (CUT_B.y - CUT_A.y) * 0.22);
+const DOOR_B = at(CUT_A, (CUT_B.x - CUT_A.x) * 0.78, (CUT_B.y - CUT_A.y) * 0.78);
+const outN = (() => {
+  const dx = CUT_B.x - CUT_A.x;
+  const dy = CUT_B.y - CUT_A.y;
+  const l = Math.hypot(dx, dy);
+  return v(dy / l, -dx / l); // outward (+x,+y)
+})();
+const boundary: Vec2[] = [v(x0, y0), v(x1, y0), CUT_A, CUT_B, v(x0, y1)];
+const porch: Vec2[] = [DOOR_A, DOOR_B, at(DOOR_B, outN.x, outN.y), at(DOOR_A, outN.x, outN.y)];
+
+// interior walls (rendered + navigation): kitchen wall, galley partition, office, restroom
+const KITCHEN_WALL_Y_END = P(495, 465).y;
+const interiorWalls: { a: Vec2; b: Vec2 }[] = [
+  { a: P(215, 465), b: P(495, 465) }, // kitchen / café wall (the pastry shelf hangs on it)
+  { a: P(215, 435), b: P(215, 1000) }, // galley partition
+  { a: P(620, 270), b: P(620, 440) }, // office
+  { a: P(620, 270), b: P(810, 270) },
+  { a: P(620, 480), b: P(810, 480) },
+  { a: P(215, 1105), b: P(215, 1300) }, // restroom
+  { a: P(35, 1105), b: P(215, 1105) },
+  { a: P(35, 1395), b: P(85, 1395) },
+  { a: P(150, 1395), b: P(215, 1395) },
+];
+const outerWalls = [
   { a: v(x0, y0), b: v(x1, y0) },
-  { a: v(x1, y0), b: CUT_B },
-  { a: CUT_B, b: DOOR_B },
-  { a: DOOR_A, b: CUT_A },
-  { a: CUT_A, b: v(x0, y1) },
+  { a: v(x1, y0), b: CUT_A },
+  { a: CUT_A, b: DOOR_A },
+  { a: DOOR_B, b: CUT_B },
+  { a: CUT_B, b: v(x0, y1) },
   { a: v(x0, y1), b: v(x0, y0) },
 ];
+const walls = [...outerWalls, ...interiorWalls];
 
-const rect = (id: string, visual: RectObstacle['visual'], ax: number, ay: number, bx: number, by: number): RectObstacle => ({ kind: 'rect', id, visual, min: v(ax, ay), max: v(bx, by) });
-const circ = (id: string, visual: CircleObstacle['visual'], x: number, y: number, r: number, facing?: number): CircleObstacle => ({ kind: 'circle', id, visual, c: v(x, y), r, facing });
+// ---------------------------------------------------------------- kitchen (plan top)
+export const KITCHEN_PROPS: Obstacle[] = [
+  box('sink', 'kitchenSink', at(P(125, 215), 0, 0), 0.75, 1.5),
+  box('prep', 'prepTable', P(262, 250), 1.5, 0.8),
+  box('oven', 'conveyorOven', P(390, 228), 0.75, 1.8),
+  box('island', 'prepTable', P(318, 397), 0.85, 1.55),
+  box('rack', 'trayRack', P(462, 410), 0.6, 0.6),
+  box('stairs', 'stairs', P(578, 210), 1.2, 1.1),
+  rect('office', 'office', P(620, 270), P(810, 480)),
+];
 
-// ---- service side (far wall)
-export const KITCHEN = rect('kitchen', 'kitchen', x0, y0, LONG_DIM.kitchenX, y1);
-export const GALLEY = rect('galley', 'galley', LONG_DIM.kitchenX, y0, 2.4, LONG_DIM.counterY); // staff strip + long pastry counter leg
-export const COUNTER_TOP = rect('counterTop', 'counter', LONG_DIM.kitchenX, LONG_DIM.counterY, -6.0, -0.9); // the L's short arm under the kitchen
-export const RESTROOM = rect('restroom', 'restroom', 6.0, y0, x1, -2.1);
-export const FRONT_BENCH = rect('frontBench', 'bench', 7.95, -1.9, x1, 2.2);
+// ---------------------------------------------------------------- galley (plan left strip)
+export const GALLEY_PROPS: Obstacle[] = [
+  box('cups', 'shelf', P(65, 375), 1.3, 0.45),
+  box('stove', 'stove', P(95, 530), 1.4, 0.9),
+  box('galleyCounter', 'counter', P(70, 700), 1.9, 0.6),
+  box('fridge1', 'fridge', P(78, 900), 1.1, 0.75),
+  box('fridge2', 'fridge', P(78, 1035), 1.1, 0.75),
+  box('dishShelf', 'dishRack', P(115, 1095), 0.35, 1.3),
+];
 
-// ---- centre column: three small round tables + one square table near the front
-const TABLE_R = 0.4;
+// ---------------------------------------------------------------- service: pastry counter, display, espresso bar
+const ARM_A = P(295, 615);
+const ARM_B = P(560, 705);
+export const COUNTER_ARM = rect('counterArm', 'counter', ARM_A, ARM_B); // the L's top: register + cake stands
+export const COUNTER_LEG = rect('counterLeg', 'pastryCase', P(290, 705), P(385, 1210)); // long glass pastry cases
+export const DISH_COUNTER = rect('dishCounter', 'dishCounter', P(230, 1230), P(360, 1300)); // dish return
+export const WALL_DISPLAY = rect('wallDisplay', 'shelf', P(230, 465), P(510, 505)); // pastry wall display
+export const ESPRESSO_BACK = rect('espressoBack', 'counter', P(640, 495), P(810, 525));
+export const ESPRESSO_FRONT = rect('espressoFront', 'espressoBar', P(612, 595), P(810, 650));
+
+export const POSTS = [circ('P1', 'post', P(560, 733), 0.16), circ('P2', 'post', P(557, 1090), 0.16), circ('P3', 'post', P(662, 600), 0.16)];
+
+// ---------------------------------------------------------------- seating
 const CHAIR_R = 0.22;
-const T1 = roundTable('T1', 'Table 1', v(-3.4, 0.4), 'y', v(-2.32, 0.4), 0.62);
-const T2 = roundTable('T2', 'Table 2', v(-0.9, 0.4), 'y', v(0.18, 0.4), 0.62);
-const T3 = roundTable('T3', 'Table 3', v(1.6, 0.4), 'y', v(2.68, 0.4), 0.62);
-const SQUARE_C = v(7.0, -0.3);
-export const SQUARE = rect('T4', 'squareTable', SQUARE_C.x - 0.4, SQUARE_C.y - 0.4, SQUARE_C.x + 0.4, SQUARE_C.y + 0.4);
-const T4: Table = {
-  id: 'T4',
-  label: 'Window table',
-  c: SQUARE_C,
-  seats: [
-    { id: 'T4a', pos: v(8.12, -0.3), facing: Math.PI }, // on the front bench
-    { id: 'T4b', pos: v(7.0, -1.05), facing: Math.PI / 2 },
-  ],
-  serve: v(5.98, -0.3),
+const chairsAlongY = (id: string, c: Vec2, d: number): Seat[] => [
+  { id: `${id}a`, pos: at(c, 0, -d), facing: Math.PI / 2 },
+  { id: `${id}b`, pos: at(c, 0, d), facing: -Math.PI / 2 },
+];
+
+// two round tables (chairs on the left/right as in the plan)
+const R1c = P(535, 895);
+const R2c = P(535, 1010);
+const R1: Table = { id: 'T1', label: 'Round table 1', c: R1c, seats: chairsAlongY('T1', R1c, 0.66), serve: at(R1c, -1.02, 0) };
+const R2: Table = { id: 'T2', label: 'Round table 2', c: R2c, seats: chairsAlongY('T2', R2c, 0.66), serve: at(R2c, 0.55, -1.4) }; // from the aisle, beside the chair
+
+// square table with chairs left, right and front
+const SQc = P(535, 1178);
+export const SQUARE = box('T3', 'squareTable', SQc, 0.8, 0.8);
+const SQ: Table = {
+  id: 'T3',
+  label: 'Square table',
+  c: SQc,
+  seats: chairsAlongY('T3', SQc, 0.66),
+  serve: at(SQc, 1.4, -0.75),
 };
 
-// ---- window booths (near wall, plan's right side, upper half)
-const BOOTH_X = [-5.7, -4.0, -2.3, -0.6];
-const booths: Table[] = BOOTH_X.map((cx, i) => ({
-  id: `B${i + 1}`,
-  label: `Booth ${i + 1}`,
-  c: v(cx, 3.62),
-  seats: [
-    { id: `B${i + 1}a`, pos: v(cx - 0.66, 3.5), facing: 0 },
-    { id: `B${i + 1}b`, pos: v(cx + 0.66, 3.5), facing: Math.PI },
-  ],
-  serve: v(cx, 2.48),
-}));
-const boothObstacles: Obstacle[] = BOOTH_X.flatMap((cx, i) => [
-  rect(`B${i + 1}t`, 'booth', cx - 0.35, 3.25, cx + 0.35, y1),
-  rect(`B${i + 1}l`, 'bench', cx - 0.85, 2.9, cx - 0.5, y1),
-  rect(`B${i + 1}r`, 'bench', cx + 0.5, 2.9, cx + 0.85, y1),
-]);
-
-// ---- communal table (near wall, lower half)
-export const COMMUNAL = rect('communal', 'communal', 1.2, 2.95, 5.6, 3.45);
-const COMMUNAL_X = [1.65, 2.55, 3.45, 4.35, 5.25];
-const communalSeats: Seat[] = [
-  ...COMMUNAL_X.map((x, i) => ({ id: `C${i + 1}a`, pos: v(x, 2.6), facing: Math.PI / 2 })),
-  ...COMMUNAL_X.map((x, i) => ({ id: `C${i + 1}b`, pos: v(x, 3.76), facing: -Math.PI / 2 })),
+// three window booths: table + bench against the window wall + one chair on the aisle side
+const BOOTH_PY = [760, 837, 953];
+const booths: Table[] = BOOTH_PY.map((py, i) => {
+  const c = P(722, py);
+  return {
+    id: `B${i + 1}`,
+    label: `Booth ${i + 1}`,
+    c,
+    seats: [
+      { id: `B${i + 1}a`, pos: at(c, 0, y1 - 0.32 - c.y), facing: -Math.PI / 2 },
+      { id: `B${i + 1}b`, pos: P(655, py), facing: Math.PI / 2 },
+    ],
+    serve: at(P(655, py), 0, -0.82),
+  };
+});
+const boothObstacles: Obstacle[] = [
+  ...booths.map((b) => box(`${b.id}t`, 'boothTable', b.c, 0.85, 0.65)),
+  rect('wallBench', 'bench', v(P(790, 720).x, y1 - 0.5), v(P(790, 995).x, y1)),
 ];
-const COMMUNAL_T: Table = { id: 'C', label: 'Communal table', c: v(3.4, 3.2), seats: communalSeats, serve: v(6.2, 3.1) };
 
-// ---- posts between the counter and the tables; P2 makes the one deliberate pinch
-export const POSTS = [circ('P1', 'post', -6.25, 1.3, 0.16), circ('P2', 'post', -0.9, -1.15, 0.16), circ('P3', 'post', 2.1, -3.65, 0.16)];
+// long communal table
+const CM_A = P(665, 1075);
+const CM_B = P(760, 1325);
+export const COMMUNAL = rect('communal', 'communal', v(CM_A.x, CM_A.y + 0.3), v(CM_B.x, Math.min(CM_B.y + 0.1, y1 - 0.62)));
+const COMM_PY = [1110, 1175, 1240, 1300];
+const communalSeats: Seat[] = [
+  ...COMM_PY.map((py, i) => ({ id: `C${i + 1}a`, pos: v(depth(py) - L / 2, COMMUNAL.min.y - 0.36), facing: Math.PI / 2 })),
+  ...COMM_PY.map((py, i) => ({ id: `C${i + 1}b`, pos: v(depth(py) - L / 2, COMMUNAL.max.y + 0.36), facing: -Math.PI / 2 })),
+];
+const COMM: Table = { id: 'C', label: 'Communal table', c: v((COMMUNAL.min.x + COMMUNAL.max.x) / 2, (COMMUNAL.min.y + COMMUNAL.max.y) / 2), seats: communalSeats, serve: v(COMMUNAL.max.x + 0.62, (COMMUNAL.min.y + COMMUNAL.max.y) / 2) };
 
-const tables = [T1, T2, T3, T4, ...booths, COMMUNAL_T];
-const roundObs: Obstacle[] = [T1, T2, T3].flatMap((t) => [
-  circ(t.id, 'table', t.c.x, t.c.y, TABLE_R),
-  ...t.seats.map((s) => circ(s.id, 'chair', s.pos.x, s.pos.y, CHAIR_R, s.facing)),
-]);
+// front of house: restroom, rug, window bench
+export const RESTROOM = rect('restroom', 'restroom', P(35, 1105), P(215, 1395));
+export const FRONT_BENCH = rect('frontBench', 'bench', v(x1 - 0.5, P(235, 1497).y), v(x1, P(665, 1497).y));
+export const RUG = { min: P(255, 1360), max: P(615, 1445) };
+const benchSeats: Seat[] = [-1.2, 0, 1.2].map((dy, i) => ({ id: `F${i + 1}`, pos: v(x1 - 0.32, (FRONT_BENCH.min.y + FRONT_BENCH.max.y) / 2 + dy), facing: Math.PI }));
+
+// customers on the window bench get their drinks handed over from the rug in front of it
+const BENCH_T: Table = { id: 'F', label: 'Window bench', c: benchSeats[1].pos, seats: [benchSeats[1], benchSeats[2]], serve: v(benchSeats[1].pos.x - 0.95, benchSeats[1].pos.y + 0.6) };
+const BENCH_L: Table = { id: 'FL', label: 'Window bench (by the restroom)', c: benchSeats[0].pos, seats: [benchSeats[0]], serve: v(benchSeats[0].pos.x - 0.95, benchSeats[0].pos.y - 0.4) };
+
+const tables: Table[] = [R1, R2, SQ, ...booths, COMM, BENCH_T, BENCH_L];
+const seatObstacles: Obstacle[] = [
+  ...[R1, R2, SQ].flatMap((t) => t.seats.map((s) => circ(s.id, 'chair', s.pos, CHAIR_R, s.facing))),
+  ...booths.map((b) => circ(b.seats[1].id, 'chair', b.seats[1].pos, CHAIR_R, b.seats[1].facing)),
+  ...communalSeats.map((s) => circ(s.id, 'chair', s.pos, CHAIR_R, s.facing)),
+];
 
 const obstacles: Obstacle[] = [
-  KITCHEN,
-  GALLEY,
-  COUNTER_TOP,
+  ...KITCHEN_PROPS,
+  ...GALLEY_PROPS,
+  COUNTER_ARM,
+  COUNTER_LEG,
+  DISH_COUNTER,
+  WALL_DISPLAY,
+  ESPRESSO_BACK,
+  ESPRESSO_FRONT,
+  ...POSTS,
+  circ(R1.id, 'table', R1.c, 0.4),
+  circ(R2.id, 'table', R2.c, 0.4),
+  SQUARE,
+  ...boothObstacles,
+  COMMUNAL,
+  ...seatObstacles,
   RESTROOM,
   FRONT_BENCH,
-  SQUARE,
-  circ('T4b', 'chair', 7.0, -1.05, CHAIR_R, Math.PI / 2),
-  COMMUNAL,
-  ...communalSeats.map((s) => circ(s.id, 'chair', s.pos.x, s.pos.y, CHAIR_R, s.facing)),
-  ...boothObstacles,
-  ...roundObs,
-  ...POSTS,
-  circ('plant1', 'plant', 5.6, -1.75, 0.28),
+  circ('plant1', 'plant', P(70, 1450), 0.28),
 ];
+
+// the café floor (where customers and Baymax operate): everything below the kitchen wall,
+// right of the galley partition, plus the passage past the espresso bar
+const PICKUP = v(ESPRESSO_FRONT.max.x + 0.62, ESPRESSO_FRONT.min.y + 0.62); // at the espresso bar / register
+void KITCHEN_WALL_Y_END;
 
 export const LONG: LayoutDef = {
   id: 'long',
-  name: 'Long café',
+  name: 'Lucky Cat Café (plan)',
   room: { minX: x0, maxX: x1 + 1.2, minY: y0, maxY: y1 + 1.2 },
   wallClearance: polygonWallClearance([boundary, porch], walls),
   walls,
@@ -119,27 +230,28 @@ export const LONG: LayoutDef = {
   tables,
   extraSeats: [],
   aisles: [
-    // the post pinch: one Baymax-width gap between P2 and the counter
-    { id: 'post-pinch', min: v(-1.6, LONG_DIM.counterY), max: v(-0.2, -0.99) },
+    // the walkway between the pastry cases and the round tables
+    { id: 'pastry-aisle', min: v(COUNTER_ARM.max.x, COUNTER_LEG.max.y), max: v(COUNTER_LEG.max.x, R1.seats[0].pos.y - CHAIR_R) },
     // the walkway in front of the window booths
-    { id: 'booth-aisle', min: v(-6.4, 1.24), max: v(0.2, 2.9) },
+    { id: 'booth-aisle', min: v(booths[0].c.x - 0.6, R1.seats[1].pos.y + CHAIR_R), max: v(booths[2].c.x + 0.6, booths[0].seats[1].pos.y - CHAIR_R) },
   ],
-  door: { inside: v(7.25, 2.75), outside: v(8.25, 3.75), a: DOOR_A, b: DOOR_B },
-  pickup: v(-5.42, -1.98),
-  orderSpot: v(-4.4, -2.3),
-  queueSpots: [v(-4.4, -2.3), v(-3.6, -2.3), v(-2.8, -2.3), v(-2.0, -2.25)],
-  auntCass: { pos: v(-5.2, -3.3), facing: Math.PI / 2 },
-  restroom: v(5.72, -3.05),
+  door: { inside: at(v((DOOR_A.x + DOOR_B.x) / 2, (DOOR_A.y + DOOR_B.y) / 2), -outN.x * 0.7, -outN.y * 0.7), outside: at(v((DOOR_A.x + DOOR_B.x) / 2, (DOOR_A.y + DOOR_B.y) / 2), outN.x * 0.7, outN.y * 0.7), a: DOOR_A, b: DOOR_B },
+  pickup: PICKUP,
+  orderSpot: at(COUNTER_ARM.max, 0.32, -1.2),
+  queueSpots: [at(COUNTER_ARM.max, 0.32, -1.2), at(COUNTER_ARM.max, 1.05, -1.0), at(COUNTER_ARM.max, 1.75, -0.6), at(COUNTER_ARM.max, 2.4, -0.3)],
+  auntCass: { pos: v(ESPRESSO_FRONT.min.x - 0.45, ESPRESSO_FRONT.min.y + 0.75), facing: 0 },
+  restroom: at(P(180, 1395), 0, 0),
   notes: {
-    yieldPoint: v(-0.9, -1.92),
-    waitingSpace: v(-2.6, -1.45),
     labels: [
-      { pos: v(-7.5, 0), text: 'Kitchen' },
-      { pos: v(-2.0, -3.3), text: 'Galley + long pastry counter' },
-      { pos: v(7.2, -3.05), text: 'Restroom' },
-      { pos: v(-3.2, 3.85), text: 'Window booths' },
-      { pos: v(3.4, 3.85), text: 'Communal table' },
-      { pos: v(8.2, 0.2), text: 'Front bench' },
+      { pos: P(300, 300), text: 'Kitchen' },
+      { pos: P(120, 760), text: 'Galley' },
+      { pos: P(340, 960), text: 'Pastry cases' },
+      { pos: P(700, 580), text: 'Espresso bar' },
+      { pos: P(710, 380), text: 'Office' },
+      { pos: P(125, 1250), text: 'Restroom' },
+      { pos: P(745, 870), text: 'Booths' },
+      { pos: P(712, 1200), text: 'Communal' },
+      { pos: P(450, 1470), text: 'Front bench' },
     ],
   },
 };

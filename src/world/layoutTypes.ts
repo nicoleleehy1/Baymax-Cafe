@@ -11,7 +11,10 @@ export interface RectObstacle {
   min: Vec2;
   max: Vec2;
   /** visual category used by the renderer */
-  visual: 'counter' | 'shelf' | 'pastryIsland' | 'staff' | 'kitchen' | 'galley' | 'bench' | 'booth' | 'communal' | 'restroom' | 'squareTable';
+  visual:
+    | 'counter' | 'shelf' | 'pastryIsland' | 'staff' | 'kitchen' | 'galley' | 'bench' | 'booth' | 'communal' | 'restroom' | 'squareTable'
+    | 'kitchenSink' | 'prepTable' | 'conveyorOven' | 'trayRack' | 'stairs' | 'office' | 'stove' | 'fridge' | 'dishRack'
+    | 'pastryCase' | 'dishCounter' | 'espressoBar' | 'boothTable';
 }
 export interface CircleObstacle {
   kind: 'circle';

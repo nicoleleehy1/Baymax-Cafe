@@ -21,7 +21,9 @@ const pts = (p: Vec2[]) => p.map((q) => `${X(q.x)},${Y(q.y)}`).join(' ');
 const FILL: Record<string, string> = {
   kitchen: '#d9cbb4', galley: '#e7d9c2', counter: '#c99566', restroom: '#d8d1c4', bench: '#b07a4f', booth: '#c99566',
   communal: '#c99566', squareTable: '#c99566', table: '#c99566', chair: '#7e5235', post: '#5b4a40', plant: '#7f9f78',
-  shelf: '#b07a4f', pastryIsland: '#c99566', staff: '#e7d9c2',
+  shelf: '#b07a4f', pastryIsland: '#c99566', staff: '#e7d9c2', kitchenSink: '#c9ced3', prepTable: '#a9a3a0', conveyorOven: '#6d6f73',
+  trayRack: '#b9a58f', stairs: '#d9cbb4', office: '#d8d1c4', stove: '#55585c', fridge: '#eef0f2', dishRack: '#b9a58f',
+  pastryCase: '#e7d9c2', dishCounter: '#cdbfae', espressoBar: '#c99566', boothTable: '#d08a4a',
 };
 
 function base(title: string): string[] {
@@ -64,9 +66,12 @@ function base(title: string): string[] {
 }
 
 const panels: string[] = [];
+if (process.argv.includes('--plain')) {
+  panels.push(`<g>${base(`${LAYOUT.name} · layout only`).join('')}</g>`);
+}
 const report: string[] = [];
 const CUST = ['#d86f7e', '#5d8fc9', '#e9a23b', '#8a6bb0', '#3f9c9a', '#7fa37a'];
-for (const id of SCENARIO_ORDER) {
+for (const id of process.argv.includes('--plain') ? [] : SCENARIO_ORDER) {
   const sc = SCENARIOS[id];
   const g = base(`${LAYOUT.name} · ${sc.title}: ${sc.subtitle}`);
   // customer routes (recorded, exogenous)
