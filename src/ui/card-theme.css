@@ -1,14 +1,15 @@
 /*
- * Card theme: Forepaw-style typography and surfaces for the existing UI cards.
+ * Card theme: Forepaw-style typography and surfaces for the existing UI cards
+ * and the top bar.
  *
- * Every selector is rooted at `.card`, so nothing here reaches the 3D scene,
- * the top bar, screen labels or the status chip. Positions, widths and padding
+ * Every selector is rooted at `.card` or `.topbar`, so nothing here reaches the 3D scene,
+ * screen labels or the status chip. Positions, widths and padding
  * stay as defined in styles.css; this file only changes type, colour and
  * surface. Import it once, after styles.css (equal specificity, later wins).
  */
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap');
 
-.card {
+:is(.card, .topbar) {
   --ct-surface: rgba(255, 251, 245, 0.86);
   --ct-surface-solid: #fffbf5;
   --ct-hair: rgba(74, 52, 36, 0.1);
@@ -37,48 +38,48 @@
   -webkit-backdrop-filter: blur(10px);
 }
 @media (prefers-reduced-transparency: reduce) {
-  .card { background: var(--ct-surface-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  :is(.card, .topbar) { background: var(--ct-surface-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 /* Everything inside a card uses Geist; monospace and Nunito overrides go. */
-.card :is(button, select, input, table, th, td, .num, .r-score, .bar-val, .tag, .option-pin) {
+:is(.card, .topbar) :is(button, select, input, table, th, td, .num, .r-score, .bar-val, .tag, .option-pin) {
   font-family: var(--ct-sans);
   font-variant-numeric: tabular-nums;
 }
-.card :is(b, strong, th) { font-weight: 500; }
+:is(.card, .topbar) :is(b, strong, th) { font-weight: 500; }
 
 /* ---------- headings and labels ---------- */
-.card .eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ct-accent); }
-.card h1 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.1; }
-.card h2 { font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
-.card .muted { color: var(--ct-muted); }
-.card .small { font-size: 12px; }
-.card .num, .card .r-score, .card .bar-val { font-size: 12px; }
-.card .section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.05em; color: var(--ct-faint); }
-.card .evidence-title { font-size: 14px; font-weight: 500; }
+:is(.card, .topbar) .eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ct-accent); }
+:is(.card, .topbar) h1 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.1; }
+:is(.card, .topbar) h2 { font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+:is(.card, .topbar) .muted { color: var(--ct-muted); }
+:is(.card, .topbar) .small { font-size: 12px; }
+:is(.card, .topbar) .num, .card .r-score, .card .bar-val { font-size: 12px; }
+:is(.card, .topbar) .section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.05em; color: var(--ct-faint); }
+:is(.card, .topbar) .evidence-title { font-size: 14px; font-weight: 500; }
 
 /* intro */
 .intro.card .lead { font-weight: 500; color: #5b4637; letter-spacing: -0.01em; }
 .intro.card p { font-size: 14px; }
 
 /* ---------- controls ---------- */
-.card .btn {
+:is(.card, .topbar) .btn {
   font-weight: 500;
   border-color: var(--ct-hair-2);
   border-radius: 999px;
   transition: background 300ms var(--ct-ease), transform 200ms var(--ct-ease), border-color 300ms var(--ct-ease);
 }
-.card .btn:hover:not(:disabled) { background: #fbf3ea; }
-.card .btn.primary { background: var(--ct-accent); border-color: var(--ct-accent); color: #fff; }
-.card .btn.primary:hover:not(:disabled) { background: #a9431f; }
-.card .btn.ghost { border-color: transparent; background: transparent; color: var(--ct-muted); }
-.card .btn.ghost:hover:not(:disabled) { color: var(--ct-text); background: rgba(74, 52, 36, 0.06); }
-.card .btn.on { background: #203f3c; color: #dffcf7; border-color: #203f3c; }
-.card .toggle { font-weight: 500; color: var(--ct-muted); }
-.card .icon-btn { color: var(--ct-faint); transition: color 200ms var(--ct-ease); }
-.card .icon-btn:hover { color: var(--ct-text); }
-.card select { border-color: var(--ct-hair-2); border-radius: 8px; color: var(--ct-text); }
-.card :is(button, select, input):focus-visible { outline: 2px solid var(--ct-teal); outline-offset: 2px; }
+:is(.card, .topbar) .btn:hover:not(:disabled) { background: #fbf3ea; }
+:is(.card, .topbar) .btn.primary { background: var(--ct-accent); border-color: var(--ct-accent); color: #fff; }
+:is(.card, .topbar) .btn.primary:hover:not(:disabled) { background: #a9431f; }
+:is(.card, .topbar) .btn.ghost { border-color: transparent; background: transparent; color: var(--ct-muted); }
+:is(.card, .topbar) .btn.ghost:hover:not(:disabled) { color: var(--ct-text); background: rgba(74, 52, 36, 0.06); }
+:is(.card, .topbar) .btn.on { background: #203f3c; color: #dffcf7; border-color: #203f3c; }
+:is(.card, .topbar) .toggle { font-weight: 500; color: var(--ct-muted); }
+:is(.card, .topbar) .icon-btn { color: var(--ct-faint); transition: color 200ms var(--ct-ease); }
+:is(.card, .topbar) .icon-btn:hover { color: var(--ct-text); }
+:is(.card, .topbar) select { border-color: var(--ct-hair-2); border-radius: 8px; color: var(--ct-text); }
+:is(.card, .topbar) :is(button, select, input):focus-visible { outline: 2px solid var(--ct-teal); outline-offset: 2px; }
 
 /* ---------- teaching A/B ---------- */
 .teach.card .option { border-radius: 10px; border-width: 1.5px; transition: transform 200ms var(--ct-ease), box-shadow 300ms var(--ct-ease); }
@@ -88,14 +89,14 @@
 
 /* ---------- evidence ---------- */
 .evidence.card .chg { border-radius: 6px; background: rgba(74, 52, 36, 0.06); }
-.card .up { color: var(--ct-teal); }
-.card .down { color: var(--ct-accent); }
-.card .tag { font-size: 10.5px; border-radius: 4px; background: transparent; border: 1px solid var(--ct-hair-2); color: var(--ct-faint); }
+:is(.card, .topbar) .up { color: var(--ct-teal); }
+:is(.card, .topbar) .down { color: var(--ct-accent); }
+:is(.card, .topbar) .tag { font-size: 10.5px; border-radius: 4px; background: transparent; border: 1px solid var(--ct-hair-2); color: var(--ct-faint); }
 
 /* ---------- tables ---------- */
-.card table.mini th { font-size: 11px; font-weight: 500; color: var(--ct-faint); border-bottom-color: var(--ct-hair-2); }
-.card table.mini td { border-bottom-color: var(--ct-hair); }
-.card table.metrics td:first-child { font-weight: 500; }
+:is(.card, .topbar) table.mini th { font-size: 11px; font-weight: 500; color: var(--ct-faint); border-bottom-color: var(--ct-hair-2); }
+:is(.card, .topbar) table.mini td { border-bottom-color: var(--ct-hair); }
+:is(.card, .topbar) table.metrics td:first-child { font-weight: 500; }
 
 /* ---------- considering inspector ---------- */
 .considering.card .stats { color: var(--ct-faint); }
@@ -106,6 +107,15 @@
 .considering.card .bar-track { height: 4px; border-radius: 2px; background: rgba(74, 52, 36, 0.08); }
 .considering.card .bar-fill { border-radius: 2px; }
 .considering.card .w { border-radius: 6px; background: rgba(74, 52, 36, 0.06); }
-.card .legend { color: var(--ct-faint); }
-.card .warn-box { border-radius: 6px; }
-.card .taught { font-weight: 500; }
+:is(.card, .topbar) .legend { color: var(--ct-faint); }
+:is(.card, .topbar) .warn-box { border-radius: 6px; }
+:is(.card, .topbar) .taught { font-weight: 500; }
+
+/* ---------- top bar ---------- */
+.topbar .brand-title { font-weight: 600; letter-spacing: -0.02em; }
+.topbar .brand-sub { color: var(--ct-muted); }
+.topbar .scenarios { border-radius: 999px; background: rgba(74, 52, 36, 0.05); box-shadow: inset 0 0 0 1px var(--ct-hair); }
+.topbar .tab { font-family: var(--ct-sans); font-weight: 500; border-radius: 999px; color: var(--ct-muted); transition: background 300ms var(--ct-ease), color 300ms var(--ct-ease); }
+.topbar .tab:hover { color: var(--ct-text); }
+.topbar .tab.active { box-shadow: 0 1px 2px rgba(42, 33, 28, 0.12); }
+.topbar .tab-num { font-weight: 500; }
