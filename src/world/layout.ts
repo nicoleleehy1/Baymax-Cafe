@@ -5,7 +5,7 @@ import { v, type Vec2 } from '../core/vec';
 export const ROOM = { minX: -7.6, maxX: 7, minY: -5, maxY: 5 };
 export const WALL = { left: -7, right: 7, back: -5, front: 5 };
 
-export const ROBOT_RADIUS = 0.5; // Baymax footprint incl. tray
+export const ROBOT_RADIUS = 0.52; // Baymax footprint: torso (0.445 max) and tray far edge (0.52) fit inside
 export const HUMAN_RADIUS = 0.25;
 
 export interface RectObstacle {
@@ -55,12 +55,12 @@ function table(id: string, label: string, c: Vec2, axis: 'x' | 'y', serve: Vec2)
 }
 
 export const TABLES: Table[] = [
-  table('T1', 'Table 1', v(-5.2, -1.2), 'x', v(-5.2, -0.2)),
-  table('T2', 'Table 2', v(-5.2, 1.5), 'x', v(-5.2, 0.5)),
-  table('T3', 'Table 3', v(-2.0, 1.0), 'y', v(-1.0, 1.0)),
-  table('T4', 'Table 4', v(5.7, 1.4), 'y', v(4.7, 1.4)),
-  table('T5', 'Table 5', v(2.2, 3.7), 'x', v(2.2, 2.7)),
-  table('T6', 'Table 6', v(-1.4, 3.9), 'x', v(-1.4, 2.9)),
+  table('T1', 'Table 1', v(-5.2, -1.2), 'x', v(-5.2, -0.15)),
+  table('T2', 'Table 2', v(-5.2, 1.5), 'x', v(-5.2, 0.45)),
+  table('T3', 'Table 3', v(-2.0, 1.0), 'y', v(-0.94, 1.0)),
+  table('T4', 'Table 4', v(5.7, 1.4), 'y', v(4.64, 1.4)),
+  table('T5', 'Table 5', v(2.2, 3.7), 'x', v(2.2, 2.64)),
+  table('T6', 'Table 6', v(-1.4, 3.9), 'x', v(-1.4, 2.84)),
 ];
 
 export const COUNTER: RectObstacle = { kind: 'rect', id: 'counter', min: v(-4.4, -5), max: v(1.8, -3.6), visual: 'counter' };
@@ -93,7 +93,7 @@ export interface AisleZone {
 export const AISLES: AisleZone[] = [{ id: 'pastry-aisle', min: v(2.9, -4.3), max: v(5.5, -2.8) }];
 
 export const DOOR = { inside: v(-6.4, 3.2), outside: v(-7.4, 3.2), min: v(-7.6, 2.55), max: v(-7, 3.85) };
-export const PICKUP = v(-0.8, -3.0); // Baymax's spot at the counter where Aunt Cass loads the tray
+export const PICKUP = v(-0.8, -2.95); // Baymax's spot at the counter where Aunt Cass loads the tray
 export const ORDER_SPOT = v(-3.4, -3.1);
 export const QUEUE_SPOTS = [v(-3.4, -3.1), v(-3.4, -2.3), v(-3.55, -1.5), v(-3.8, -0.7)];
 export const AUNT_CASS = { pos: v(-1.3, -4.4), facing: Math.PI / 2 };

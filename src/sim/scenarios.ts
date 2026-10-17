@@ -50,8 +50,8 @@ function pairAcross(a: Vec2, b: Vec2, f: number, halfGap: number): [Vec2, Vec2] 
 const FOREVER = 1e6;
 
 // ---- TEACH: a pair chatting right across the line to Table 4
-const T4_SERVE = v(4.7, 1.4);
-const [teachA, teachB] = pairAcross(PICKUP, T4_SERVE, 0.48, 1.02);
+const T4_SERVE = v(4.64, 1.4);
+const [teachA, teachB] = pairAcross(PICKUP, T4_SERVE, 0.48, 1.05);
 
 const teach: Scenario = {
   id: 'teach',
@@ -78,8 +78,8 @@ const teach: Scenario = {
 };
 
 // ---- GENERALIZE: a different pair, elsewhere, on the way to Table 5
-const T5_SERVE = v(2.2, 2.7);
-const [genA, genB] = pairAcross(PICKUP, T5_SERVE, 0.6, 1.05);
+const T5_SERVE = v(2.2, 2.64);
+const [genA, genB] = pairAcross(PICKUP, T5_SERVE, 0.6, 1.08);
 
 const generalize: Scenario = {
   id: 'generalize',
