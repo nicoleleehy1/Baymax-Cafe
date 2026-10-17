@@ -1,29 +1,17 @@
-// 3D blockout of the long café, generated directly from the shared layout obstacles so the
-// rendered footprints are exactly the navigation footprints. Dollhouse cutaway: the near
+// 3D long café, generated directly from the shared layout obstacles so the rendered
+// footprints are exactly the navigation footprints. Dollhouse cutaway: the near
 // (window) wall and the far counter are kept low so Baymax and the choices stay visible.
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import type { Obstacle } from '../world/layoutTypes';
 import { LAYOUT } from '../world/layout';
 import { PALETTE, softMat } from './style/shapes';
-
-const HEIGHT: Record<string, number> = {
-  kitchen: 1.0, galley: 0.95, counter: 0.95, restroom: 1.2, bench: 0.42, booth: 0.62, communal: 0.62,
-  squareTable: 0.62, table: 0.62, chair: 0.38, post: 1.3, plant: 0.9,
-};
-const COLOR: Record<string, string> = {
-  kitchen: PALETTE.creamShade, galley: PALETTE.woodDark, counter: PALETTE.wood, restroom: '#d8d1c4', bench: PALETTE.wood,
-  booth: PALETTE.woodLight, communal: PALETTE.woodLight, squareTable: PALETTE.woodLight, table: PALETTE.woodLight,
-  chair: PALETTE.terracottaSoft, post: '#8a6a52', plant: PALETTE.green,
-};
+import { LongProps } from './LongProps';
+import { RUG } from '../world/layouts/long';
 
 export function LongBlockout() {
   const mats = useMemo(() => {
     const m: Record<string, THREE.Material> = {};
-    for (const [k, c] of Object.entries(COLOR)) m[k] = softMat(c, { roughness: 0.85 });
     m.wall = softMat(PALETTE.cream, { roughness: 0.95 });
-    m.floorA = new THREE.MeshStandardMaterial({ color: '#e9dcc6', roughness: 0.9 });
-    m.floorB = new THREE.MeshStandardMaterial({ color: '#dccbb0', roughness: 0.9 });
     return m;
   }, []);
   const R = LAYOUT.room;
@@ -63,27 +51,12 @@ export function LongBlockout() {
           </mesh>
         );
       })}
-      {LAYOUT.obstacles.map((o) => (
-        <ObstacleMesh key={o.id} o={o} mat={mats[o.visual] ?? mats.wall} />
-      ))}
-    </group>
-  );
-}
-
-function ObstacleMesh({ o, mat }: { o: Obstacle; mat: THREE.Material }) {
-  const h = HEIGHT[o.visual] ?? 0.6;
-  if (o.kind === 'rect') {
-    const w = o.max.x - o.min.x;
-    const d = o.max.y - o.min.y;
-    return (
-      <mesh position={[(o.min.x + o.max.x) / 2, h / 2, (o.min.y + o.max.y) / 2]} material={mat} castShadow receiveShadow>
-        <boxGeometry args={[w, h, d]} />
+      {/* rug by the front window */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(RUG.min.x + RUG.max.x) / 2, 0.006, (RUG.min.y + RUG.max.y) / 2]} receiveShadow>
+        <planeGeometry args={[RUG.max.x - RUG.min.x, RUG.max.y - RUG.min.y]} />
+        <meshStandardMaterial color="#c9a27a" roughness={1} />
       </mesh>
-    );
-  }
-  return (
-    <mesh position={[o.c.x, h / 2, o.c.y]} material={mat} castShadow receiveShadow>
-      <cylinderGeometry args={[o.r, o.r, h, 32]} />
-    </mesh>
+      <LongProps obstacles={LAYOUT.obstacles} />
+    </group>
   );
 }

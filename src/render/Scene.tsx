@@ -22,7 +22,7 @@ import { SimDriver } from './SimDriver';
 // dollhouse framing per layout: the long café is viewed from its cut-away window side
 const DEFAULT_SHOT =
   LAYOUT_ID === 'long'
-    ? { pos: new THREE.Vector3(0.0, 14.5, 11.5), target: new THREE.Vector3(0.0, 0, 0.3) }
+    ? { pos: new THREE.Vector3(0.0, 15.5, 12.5), target: new THREE.Vector3(0.0, 0, 0.6) }
     : { pos: new THREE.Vector3(1.0, 9.2, 11.6), target: new THREE.Vector3(0.2, 0, 0.4) };
 
 export function Scene() {
