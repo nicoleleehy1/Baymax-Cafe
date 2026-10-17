@@ -9,6 +9,7 @@ import type { Vec2 } from '../core/vec';
 import type { Look } from '../sim/customers';
 import { ROBOT_RADIUS } from '../world/layout';
 import { BaymaxModel, type BaymaxPose } from './Baymax';
+import { CAST, CharacterModel, MochiCat } from './characters';
 import { StoryChair, StoryTable, useFurnitureKit } from './Furniture';
 import { PersonModel, type PersonPose } from './Person';
 import { PALETTE } from './style/shapes';
@@ -16,14 +17,21 @@ import { PALETTE } from './style/shapes';
 const PROTO: Look = { shirt: '#d9826a', pants: '#56607a', skin: '#f2c7a6', hair: '#5a3b2a', hairStyle: 'bun', height: 1 };
 const PROTO_B: Look = { ...PROTO, shirt: '#7f9f78', hair: '#2f2420', hairStyle: 'short' };
 
-type Shot = 'overview' | 'baymax' | 'customer' | 'portrait' | 'table';
+type Shot = 'overview' | 'baymax' | 'customer' | 'portrait' | 'table' | 'cast' | 'faces' | 'mochi';
 const SHOTS: Record<Shot, { pos: [number, number, number]; target: [number, number, number] }> = {
   overview: { pos: [0.6, 3.6, 6.4], target: [0.2, 0.6, 0] },
   baymax: { pos: [1.3, 1.6, 2.7], target: [-0.1, 0.95, 0] },
   customer: { pos: [2.3, 1.0, 2.6], target: [1.7, 0.55, 0.2] },
   portrait: { pos: [1.95, 0.95, -0.55], target: [1.38, 0.82, -1.3] },
   table: { pos: [-1.0, 1.5, 3.0], target: [-1.9, 0.45, -0.9] },
+  cast: { pos: [-0.5, 1.7, 7.4], target: [-0.5, 0.6, 2.0] },
+  faces: { pos: [-0.5, 1.05, 3.55], target: [-0.5, 0.9, 2.0] },
+  mochi: { pos: [-3.6, 1.1, 1.4], target: [-1.0, 0.3, 0.4] },
 };
+
+// cast line-up in front of the review loop, each with a slightly different idle beat
+const LINEUP_Z = 2.0;
+const lineup = CAST.map((spec, i) => ({ spec, x: -2.5 + i * 0.8, seed: 11 + i * 3 }));
 
 /** Scripted review loop: accelerate, cruise, brake, turn in place, idle, return. */
 function baymaxScript(t: number): { pos: Vec2; heading: number; vel: Vec2 } {
@@ -102,7 +110,7 @@ function Stage({ shot, showFootprint }: { shot: Shot; showFootprint: boolean }) 
       <directionalLight position={[-4, 3, 5]} intensity={0.45} color="#d6e2ff" />
       {/* floor + back wall */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[12, 8]} />
+        <planeGeometry args={[12, 14]} />
         <meshStandardMaterial color="#d9b48d" roughness={0.9} />
       </mesh>
       <mesh position={[0, 1.5, -2.6]} receiveShadow>
@@ -116,6 +124,15 @@ function Stage({ shot, showFootprint }: { shot: Shot; showFootprint: boolean }) 
       <ContactShadows position={[0, 0.002, 0]} scale={10} resolution={1024} blur={2.6} opacity={0.35} far={1.5} color="#5a3a26" />
 
       <BaymaxModel source={bay} seed={1} />
+      <MochiCat leader={() => ({ ...baymaxScript(clock.current), visible: true })} seed={4} />
+      {lineup.map(({ spec, x, seed }, i) => (
+        <CharacterModel
+          key={spec.id}
+          spec={spec}
+          seed={seed}
+          source={() => ({ pos: { x, y: LINEUP_Z }, facing: Math.PI / 2 + (i - 2.5) * -0.06, state: 'idle', gait: 0, visible: true })}
+        />
+      ))}
       <PersonModel look={PROTO} source={cust} seed={2} />
       <PersonModel look={PROTO} source={chatA} seed={3} />
       <PersonModel look={PROTO_B} source={chatB} seed={8} />
