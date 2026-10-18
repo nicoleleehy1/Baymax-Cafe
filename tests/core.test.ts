@@ -6,7 +6,8 @@ import { plan } from '../src/planning/planner';
 import { predictHuman } from '../src/prediction/predictor';
 import { SimEngine } from '../src/sim/engine';
 import { SCENARIOS, type Scenario } from '../src/sim/scenarios';
-import { LAYOUT_ID, ROBOT_RADIUS, HUMAN_RADIUS } from '../src/world/layout';
+import { LAYOUT, LAYOUT_ID, ROBOT_RADIUS, HUMAN_RADIUS } from '../src/world/layout';
+import type { Vec2 } from '../src/core/vec';
 
 /** Run TEACH headlessly with a teacher that prefers less conversation intrusion. */
 function teach() {
@@ -175,6 +176,22 @@ describe('prediction and replanning', () => {
     const obs = eng.observe();
     for (const h of obs.humans) expect(Object.keys(h).sort()).toEqual(['facing', 'id', 'pos', 'radius', 'vel']);
     expect(JSON.stringify(obs)).not.toMatch(/script|priv|target|seat/);
+  });
+});
+
+describe('authored scenes', () => {
+  it('conversation partners stand in the same room (no wall between them)', () => {
+    const cross = (p: Vec2, q: Vec2, a: Vec2, b: Vec2): boolean => {
+      const d = (p: Vec2, q: Vec2, r: Vec2) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+      return d(p, q, a) * d(p, q, b) < 0 && d(a, b, p) * d(a, b, q) < 0;
+    };
+    for (const sc of Object.values(SCENARIOS)) {
+      for (const g of sc.groups) {
+        const [a, b] = g.members.map((m) => sc.customers.find((c) => c.id === m)!.start.pos);
+        const between = LAYOUT.walls.filter((w) => cross(a, b, w.a, w.b));
+        expect(between, `${sc.id}/${g.id} has a wall between its members`).toEqual([]);
+      }
+    }
   });
 });
 
