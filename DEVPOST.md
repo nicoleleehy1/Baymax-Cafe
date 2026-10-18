@@ -32,6 +32,10 @@ An interactive 3D café where a Baymax-inspired robot delivers drinks around cus
 - **Hard safety first, preferences second.** Any candidate that comes within a margin of a predicted person or touches static geometry is rejected before scoring. If nothing survives, Baymax brakes. Learning can't touch this layer.
 - **Preference learning:** six normalized cost features (delay, closeness to people, conversation intrusion, speed near people, aisle blocking, abrupt motion), utility U = −w·φ, and a Bradley-Terry model P(A ≻ B) = σ(U(A) − U(B)) refit on every stored answer by gradient descent with a pull back toward the initial weights. The delay weight is fixed at 1 as the unit of measure, so every other weight reads as "how many 3-second units of delay Baymax will accept to avoid one unit of this cost."
 - **When to ask:** an active-learning heuristic. Baymax asks only when the chosen option and the best option from a different behavior class are both safe, score within 1.2 of each other, differ meaningfully in social features, and a person is nearby, with at most 2 questions per run.
+- **Neural reward model, pretrained then fine-tuned** (`src/learning/neural`). A second learner, run headlessly so far: a 46→32→32→1 MLP (2,593 parameters, hand-written backprop and Adam, no ML library) scores each candidate from a richer descriptor than the six features: a 10-step timeline of closeness to predicted people, speed and aisle occupancy, meters through conversation areas over the whole route, and the maneuver type. Its utility is U = −delay + 0.1·f_θ(x), so delay keeps its fixed weight as the unit of measure, just like the linear model.
+  - *Pretraining:* we recorded 15,698 decisions from the factory planner across all four floors, with randomly perturbed weights so Baymax visits varied states. The network is distilled from three floors (11,954 decisions, listwise KL plus a centered utility-matching loss). The top floor stays held out.
+  - *Fine-tuning:* each answer trains the network with the same Bradley-Terry loss, P(A ≻ B) = σ(U(A) − U(B)), starting from the pretrained weights. Two terms keep it from forgetting: an L2 pull toward the pretrained parameters, and a 96-situation replay set where every option crosses conversations equally, which the network must keep ranking as before. This is the same pretrain, then preference-tune, then stay-close-to-the-reference recipe used for LLMs, at robot scale. One fine-tune takes about 2 s in Node.
+  - Hard safety is unchanged. The network only re-ranks candidates that already passed collision rejection; a test runs a deliberately random network and checks it never picks an unsafe one.
 - **Headless evaluation:** `npm run eval` runs the same planner synchronously and deterministically and prints the metrics below; a Vitest suite checks learning, transfer, safety, prediction and repeatability.
 
 ## Measured results
@@ -49,12 +53,34 @@ From `npm run eval`, with a scripted teacher that gives one answer preferring th
 
 All deliveries succeeded, with zero collisions and zero hard-brake events in every run. One answer removed conversation intrusions in a scene Baymax had never been asked about. Consideration costs about 2 seconds per delivery, and we show that trade-off openly. Adapt is unchanged by teaching, as it should be: yielding to a crossing person comes from prediction plus the safety layer, not from learned weights. Planning takes about 1 to 3 ms on average per update in Node on a laptop.
 
+### Neural reward model
+
+From `npm run eval:neural`, again with one scripted answer per floor. On the café (floor 1):
+
+| Scenario | Policy | Time | Conversation intrusions | Min clearance | Collisions |
+|---|---|---|---|---|---|
+| Teach | factory planner | 10.5 s | 1 | 0.13 m | 0 |
+| Teach | pretrained network | 10.5 s | 1 | 0.13 m | 0 |
+| Teach | fine-tuned (1 answer) | 13.0 s | 0 | 0.62 m | 0 |
+| Generalize | factory planner | 12.3 s | 1 | 0.36 m | 0 |
+| Generalize | pretrained network | 12.3 s | 1 | 0.36 m | 0 |
+| Generalize | fine-tuned (1 answer) | 16.0 s | 0 | 0.27 m | 0 |
+| Adapt | factory planner | 15.2 s | 0 | 0.22 m | 0 |
+| Adapt | fine-tuned (1 answer) | 15.2 s | 0 | 0.22 m | 0 |
+
+- **Pretraining works:** the pretrained network matches the factory planner in closed loop on all 12 floor-and-scenario runs (same choices and intrusions, delivery times within 0.1 s), including the held-out top floor. Its picks cost on average 0.0000 utility relative to the factory's on the held-out floor. A caveat: because delay is built in, even the untrained network already makes the factory's pick 84 to 92% of the time, so the learned part mainly settles the close calls.
+- **One answer generalizes on every floor:** fine-tuning on the floor's own Teach question removes conversation intrusions in both Teach and Generalize on all four floors (8 of 8 runs), Adapt is unchanged, and every delivery completes with zero collisions.
+- **Held-out preference pairs:** among recorded options that differ by more than 0.3 m of conversation and less than 3 s of delay, the network ranks the less intrusive one higher 11 to 21% of the time before fine-tuning and 96 to 100% after. On pairs that don't involve conversations, 88 to 95% keep their pretrained order.
+- **Where it is weaker than the linear model:** it is slower to deliver (the floor-2 Generalize run takes 37.8 s against 12.8 s, as Baymax waits out a crowded passage). A network fine-tuned on the café and carried upstairs unchanged removes intrusions in 3 of 6 runs, while the six-weight linear model transfers in all of them. With one answer, the simpler model generalizes better across rooms. Planning with the network costs about 10 ms per update against about 5 ms.
+- **Not in the interactive app yet:** the app still learns with the linear model. The network runs in the eval and tests, in code that already works inside a Web Worker.
+
 ## Challenges we ran into
 
 - **Making the question worth asking.** Asking every time is annoying and asking never teaches nothing. Tuning the query rule so Baymax asks once, at the moment the choice is genuinely close, took a lot of iteration.
 - **Keeping learning away from safety.** We had to structure the planner so collision rejection happens before scoring, then prove with tests that even extreme weights never select an unsafe candidate.
 - **Fair before/after comparisons.** Live customers react to Baymax, so two runs never match. For evaluation and replay, customers follow recorded trajectories so both policies face identical motion.
 - **Determinism across worker, browser and Node.** We skipped a physics engine and did all clearance queries on analytic 2D floor geometry, so the same planner runs in the worker, in tests and in the eval CLI with identical results. Every plan carries an epoch and request id so stale worker results are dropped.
+- **A neural reward that learned to procrastinate.** Our first fine-tuned network learned "don't be inside a conversation during the next 3 seconds" and simply waited outside the planning horizon forever. Fixing delay as the unit of measure and giving conversation overlap only as meters over the whole route fixed it; the replay set stopped the lesson from leaking into unrelated choices.
 - **Honest explanations.** Baymax's lines are templates, so we made each one fire only when planner data backs it (the "scenic route" line only plays when the chosen route skirts a conversation the best direct option would cross).
 
 ## Accomplishments that we're proud of
@@ -69,13 +95,15 @@ All deliveries succeeded, with zero collisions and zero hard-brake events in eve
 
 - The human touch is most valuable at the margin: when every option is already safe and the remaining choice is about comfort and courtesy.
 - A small linear reward model can transfer surprisingly well when the features are the right ones, but it also picks up incidental correlations. In the Teach question the "around" option also turns more, so the abrupt-motion weight drops (0.40 to about 0.04). We show that in the evidence card rather than hide it.
+- Fine-tuning a pretrained network from one answer works, but only with a pull back toward the reference model; without it the lesson leaked into unrelated choices and Baymax got timid everywhere. With one answer, the six interpretable weights still transfer between rooms better than the network does.
 - Being explicit about what is learned versus authored makes the demo more convincing, not less.
 
 ## What is learned vs. authored
 
 We want to be clear about this:
 
-- **Learned from your answers:** the weights on closeness, conversation intrusion, speed near people, aisle blocking and abrupt motion.
+- **Learned from your answers:** the weights on closeness, conversation intrusion, speed near people, aisle blocking and abrupt motion (linear model, in the app); all 2,593 network parameters during fine-tuning (neural model, headless).
+- **Learned offline:** the neural model's pretrained weights, distilled from the factory planner's recorded decisions. Its descriptor, architecture and loss terms are authored.
 - **Authored by us:** the feature definitions, initial weights, the delay weight (scale anchor), café geometry, customer scripts, collision margins, dynamics limits, route hysteresis and all dialogue templates.
 - **Conversation groups are authored scene annotations**, not perceived from body language.
 - **Customer avoidance is a simple time-to-collision heuristic**, not ORCA.
@@ -85,7 +113,8 @@ We want to be clear about this:
 ## What's next for After You
 
 - Visual detection of conversation groups (F-formations) instead of annotations.
-- Context-dependent preferences (a busy lunch rush versus a quiet afternoon), or a small neural reward model on the same preference store.
+- Wire the neural reward model into the interactive app, with a toggle against the linear model, and fine-tune it in the planning worker from the same answers.
+- Context-dependent preferences (a busy lunch rush versus a quiet afternoon), which the neural model's richer input makes possible.
 - Smarter questions using expected information gain over a posterior on the weights, instead of a score-closeness heuristic.
 - ORCA for customers and learned human trajectory forecasting.
 - An optional LLM to parse Aunt Cass's requests ("the couple by the window wants cocoa") and to explain choices strictly from the planner's own feature data.

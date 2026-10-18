@@ -25,6 +25,8 @@ npm install
 npm run dev          # http://localhost:5173
 npm test             # 14 verification tests (vitest, headless)
 npm run eval         # reproduces teach → generalize → adapt headlessly and prints measured metrics
+npm run eval:neural  # neural reward model: pretrained vs. fine-tuned from one answer, every floor
+npm run neural:train # re-collect planner decisions and re-pretrain the network (~2 min)
 npm run build        # type-check + production build
 ```
 
