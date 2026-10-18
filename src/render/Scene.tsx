@@ -8,7 +8,7 @@ import { angleOf, sub } from '../core/vec';
 import { SCENARIOS } from '../sim/scenarios';
 import { controller } from '../state/controller';
 import { useApp } from '../state/store';
-import { AUNT_CASS, FLOOR_HEIGHT, LAYOUT, LAYOUT_ID, tableById } from '../world/layout';
+import { AUNT_CASS, BUILDING, FLOOR_HEIGHT, LAYOUT, LAYOUT_ID, tableById } from '../world/layout';
 import { Building } from './Building';
 import { CAST, CharacterModel } from './characters';
 import { BaymaxModel, type BaymaxPose } from './Baymax';
@@ -20,16 +20,70 @@ import { ReplayScene } from './Replay';
 import { TeachingPreview } from './Teaching';
 import { SimDriver } from './SimDriver';
 
-// dollhouse framing per layout: the building is viewed from its cut-away window side
-const DEFAULT_SHOT =
-  LAYOUT_ID === 'classic'
-    ? { pos: new THREE.Vector3(1.0, 9.2, 11.6), target: new THREE.Vector3(0.2, 0, 0.4) }
-    : { pos: new THREE.Vector3(0.0, 15.5, 12.5), target: new THREE.Vector3(0.0, 0, 0.6) };
-// whole-building shot: pull back and aim at the middle of the stack (active floor is y = 0)
-const BUILDING_SHOT = (() => {
-  const mid = (2 - LAYOUT.floor) * FLOOR_HEIGHT;
-  return { pos: new THREE.Vector3(14, mid + 16, 24), target: new THREE.Vector3(0, mid, 0) };
-})();
+// dollhouse framing per layout: the building is viewed from its cut-away window side.
+// The shots below only fix the viewing *direction*; `fitShot` places the target and distance so the
+// room (or the whole stack) fills the part of the screen the toolbar and the bottom cards leave free.
+const VIEW_DIR = LAYOUT_ID === 'classic' ? new THREE.Vector3(0.8, 9.2, 11.2) : new THREE.Vector3(0.0, 13.0, 12.5);
+const BUILDING_DIR = new THREE.Vector3(14, 16, 24);
+const DEFAULT_SHOT = { pos: VIEW_DIR.clone().normalize().multiplyScalar(19), target: new THREE.Vector3(0, 0, 0) };
+// screen region (NDC) the content should sit in: the toolbar takes the top ~7%, the cards the bottom ~17%
+const FRAME = { minX: -0.9, maxX: 0.9, minY: -0.66, maxY: 0.86 };
+
+function boxCorners(min: THREE.Vector3, max: THREE.Vector3): THREE.Vector3[] {
+  const out: THREE.Vector3[] = [];
+  for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) out.push(new THREE.Vector3(x, y, z));
+  return out;
+}
+
+/** what should be on screen: the active room, or the whole stack of storeys (active floor at y = 0) */
+function viewBox(building: boolean): THREE.Vector3[] {
+  if (!building || LAYOUT_ID === 'classic') {
+    const R = LAYOUT.room;
+    return boxCorners(new THREE.Vector3(R.minX, -0.25, R.minY), new THREE.Vector3(R.maxX, 2.3, R.maxY));
+  }
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  for (const def of BUILDING) {
+    const y = (def.floor - LAYOUT.floor) * FLOOR_HEIGHT;
+    min.min(new THREE.Vector3(def.room.minX, y - 0.25, def.room.minY));
+    max.max(new THREE.Vector3(def.room.maxX, y + 2.8, def.room.maxY));
+  }
+  return boxCorners(min, max);
+}
+
+/** Find target + camera position along `dir` so `pts` project inside FRAME (iterative; perspective-correct). */
+function fitShot(pts: THREE.Vector3[], dir: THREE.Vector3, cam: THREE.PerspectiveCamera): { pos: THREE.Vector3; target: THREE.Vector3 } {
+  const d = dir.clone().normalize();
+  const target = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / pts.length);
+  let dist = 20;
+  const probe = cam.clone();
+  const fw = FRAME.maxX - FRAME.minX;
+  const fh = FRAME.maxY - FRAME.minY;
+  const fcx = (FRAME.minX + FRAME.maxX) / 2;
+  const fcy = (FRAME.minY + FRAME.maxY) / 2;
+  const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+  for (let i = 0; i < 10; i++) {
+    probe.position.copy(target).addScaledVector(d, dist);
+    probe.lookAt(target);
+    probe.updateMatrixWorld();
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      const q = p.clone().project(probe);
+      minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
+    }
+    const scale = Math.max((maxX - minX) / fw, (maxY - minY) / fh);
+    // recentre: move the target in the camera's screen plane by the offset of the box from the frame
+    const ox = (minX + maxX) / 2 - fcx;
+    const oy = (minY + maxY) / 2 - fcy;
+    const right = new THREE.Vector3().setFromMatrixColumn(probe.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(probe.matrixWorld, 1);
+    target.addScaledVector(right, ox * dist * tanV * cam.aspect).addScaledVector(up, oy * dist * tanV);
+    dist *= scale;
+    if (Math.abs(scale - 1) < 0.003 && Math.abs(ox) < 0.003 && Math.abs(oy) < 0.003) break;
+  }
+  return { pos: target.clone().addScaledVector(d, dist), target };
+}
 
 export function Scene() {
   return (
@@ -237,7 +291,7 @@ function DeliveredCup() {
 
 function CameraRig() {
   const controls = useRef<OrbitControlsImpl>(null);
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const runState = useApp((s) => s.runState);
   const query = useApp((s) => s.query);
   const replayActive = useApp((s) => s.replayActive);
@@ -247,8 +301,9 @@ function CameraRig() {
   useEffect(() => {
     const ctl = controls.current;
     if (!ctl) return;
-    let toP = (buildingView ? BUILDING_SHOT : DEFAULT_SHOT).pos.clone();
-    let toT = (buildingView ? BUILDING_SHOT : DEFAULT_SHOT).target.clone();
+    const fit = fitShot(viewBox(buildingView), buildingView ? BUILDING_DIR : VIEW_DIR, camera as THREE.PerspectiveCamera);
+    let toP = fit.pos;
+    let toT = fit.target;
     if (!buildingView && (runState === 'teaching' || runState === 'learning') && query?.query) {
       const a = query.candidates[query.query.a];
       const b = query.candidates[query.query.b];
@@ -276,7 +331,7 @@ function CameraRig() {
       }
     }
     anim.current = { fromP: camera.position.clone(), fromT: ctl.target.clone(), toP, toT, t: 0 };
-  }, [runState === 'teaching' || runState === 'learning', query, replayActive, buildingView, camera]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [runState === 'teaching' || runState === 'learning', query, replayActive, buildingView, camera, size.width, size.height]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame((_, dt) => {
     const a = anim.current;
@@ -296,9 +351,10 @@ function CameraRig() {
       makeDefault
       enableDamping
       dampingFactor={0.08}
-      minDistance={4}
-      maxDistance={40}
-      maxPolarAngle={Math.PI / 2.25}
+      minDistance={3}
+      maxDistance={45}
+      maxPolarAngle={Math.PI / 2.08}
+      screenSpacePanning
       target={DEFAULT_SHOT.target.toArray()}
     />
   );
