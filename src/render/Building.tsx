@@ -41,10 +41,6 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
   );
   const R = def.room;
   const floorTex = useMemo(() => makeFloorTexture(def), [def]);
-  const onEdge = (p: { x: number; y: number }): boolean => Math.abs(p.x - R.minX) < 0.05 || Math.abs(p.x - R.maxX) < 0.05 || Math.abs(p.y - R.minY) < 0.05 || Math.abs(p.y - R.maxY) < 0.05;
-  // a wall is exterior when both ends sit on the building's outline (the café's angled
-  // entrance wall counts too: its ends are on the outline)
-  const exterior = (w: { a: { x: number; y: number }; b: { x: number; y: number } }): boolean => onEdge(w.a) && onEdge(w.b) && !(w.a.x === w.b.x && Math.abs(w.a.x - R.minX) > 0.05 && Math.abs(w.a.x - R.maxX) > 0.05) && !(w.a.y === w.b.y && Math.abs(w.a.y - R.minY) > 0.05 && Math.abs(w.a.y - R.maxY) > 0.05);
   return (
     <group>
       {/* slab + finished floor */}
@@ -61,7 +57,7 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
         const L = Math.hypot(dx, dy);
         // dollhouse: exterior walls are taken down to a low plinth so every room is visible;
         // interior walls keep their height
-        const h = w.h ?? (exterior(w) ? 0.22 : active ? 2.8 : 1.6);
+        const h = w.h ?? (w.exterior ? 0.22 : active ? 2.8 : 1.6);
         return (
           <mesh key={i} position={[(w.a.x + w.b.x) / 2, h / 2, (w.a.y + w.b.y) / 2]} rotation={[0, -Math.atan2(dy, dx), 0]} material={mats.wall} castShadow receiveShadow>
             <boxGeometry args={[L + 0.15, h, 0.15]} />

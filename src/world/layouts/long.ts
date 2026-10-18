@@ -87,7 +87,7 @@ const outerWalls = [
   { a: CUT_B, b: v(x0, y1) },
   { a: v(x0, y1), b: v(x0, y0) },
 ];
-const walls = [...outerWalls, ...interiorWalls];
+const walls = [...outerWalls.map((w) => ({ ...w, exterior: true })), ...interiorWalls];
 
 // ---------------------------------------------------------------- kitchen (plan top)
 export const KITCHEN_PROPS: Obstacle[] = [

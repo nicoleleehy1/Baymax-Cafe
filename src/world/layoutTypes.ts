@@ -67,7 +67,7 @@ export interface LayoutDef {
   room: { minX: number; maxX: number; minY: number; maxY: number };
   wallClearance: (p: Vec2) => number;
   /** wall segments (navigation + rendering); `h` overrides the rendered height (screens, half walls) */
-  walls: { a: Vec2; b: Vec2; h?: number }[];
+  walls: { a: Vec2; b: Vec2; h?: number; exterior?: boolean }[];
   /** flat decoration that is walked over, not around (rugs) */
   decor?: { id: string; kind: 'rug' | 'roundRug' | 'tile'; min: Vec2; max: Vec2; color?: string }[];
   /** window openings drawn as glass on the outer wall */

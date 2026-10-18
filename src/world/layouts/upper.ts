@@ -17,10 +17,10 @@ const mapper = (left: number, right: number, top: number, bottom: number) => (px
 const circ = (id: string, visual: CircleObstacle['visual'], c: Vec2, r: number, facing?: number): CircleObstacle => ({ kind: 'circle', id, visual, c, r, facing });
 const at = (c: Vec2, dx: number, dy: number): Vec2 => v(c.x + dx, c.y + dy);
 const outer = [
-  { a: v(x0, y0), b: v(x1, y0) },
-  { a: v(x1, y0), b: v(x1, y1) },
-  { a: v(x1, y1), b: v(x0, y1) },
-  { a: v(x0, y1), b: v(x0, y0) },
+  { a: v(x0, y0), b: v(x1, y0), exterior: true },
+  { a: v(x1, y0), b: v(x1, y1), exterior: true },
+  { a: v(x1, y1), b: v(x0, y1), exterior: true },
+  { a: v(x0, y1), b: v(x0, y0), exterior: true },
 ];
 const boundary: Vec2[] = [v(x0, y0), v(x1, y0), v(x1, y1), v(x0, y1)];
 const CHAIR_R = 0.22;
