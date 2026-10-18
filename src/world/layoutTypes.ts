@@ -22,14 +22,14 @@ export interface RectObstacle {
     | 'kitchenSink' | 'prepTable' | 'conveyorOven' | 'trayRack' | 'stairs' | 'office' | 'stove' | 'fridge' | 'dishRack'
     | 'pastryCase' | 'dishCounter' | 'espressoBar' | 'boothTable'
     | 'bed' | 'sofa' | 'armchair' | 'desk' | 'workbench' | 'planter' | 'tub' | 'toilet' | 'sink' | 'diningTable' | 'kitchenette'
-    | 'windowSeat' | 'wardrobe' | 'clutter' | 'bookshelf' | 'rug' | 'stairsUp' | 'landing';
+    | 'windowSeat' | 'wardrobe' | 'clutter' | 'bookshelf' | 'rug' | 'stairsUp' | 'landing' | 'workstation' | 'divider';
 }
 export interface CircleObstacle {
   kind: 'circle';
   id: string;
   c: Vec2;
   r: number;
-  visual: 'table' | 'chair' | 'plant' | 'post' | 'stool' | 'pouf' | 'parts';
+  visual: 'table' | 'chair' | 'plant' | 'post' | 'stool' | 'pouf' | 'parts' | 'officeChair';
   /** chair facing angle (radians, floor plane) */
   facing?: number;
 }

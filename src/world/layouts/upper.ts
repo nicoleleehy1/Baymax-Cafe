@@ -243,7 +243,8 @@ const hiroObstacles: Obstacle[] = [
   // workbenches along the back wall of the room
   K3.rect('bench3a', 'workbench', 325, 650, 430, 740, TO_BACK),
   K3.rect('bench3b', 'workbench', 445, 650, 545, 780, TO_BACK),
-  K3.rect('bench3c', 'desk', 560, 655, 780, 740, TO_BACK),
+  K3.rect('bench3c', 'workstation', 560, 655, 780, 740, TO_BACK), // two monitors, mouse, hardware
+  circ('benchChair3', 'officeChair', P3(670, 800), 0.26, TO_BACK),
   K3.rect('side3', 'squareTable', 722, 760, 790, 880),
   // beds: Tadashi's by the right bay, Hiro's in the front-left bay
   K3.rect('bedRight3', 'bed', 590, 910, 798, 1080, TO_RIGHT),
@@ -255,6 +256,11 @@ const hiroObstacles: Obstacle[] = [
   K3.rect('desk3', 'desk', 325, 1345, 500, 1425, TO_FRONT),
   K3.rect('deskChair3', 'armchair', 350, 1272, 440, 1340, TO_FRONT),
   K3.rect('bayFront3', 'windowSeat', 640, 1420, 798, 1468),
+  // lounge corner on the round rug: a couch facing the bay, with a beanbag beside it
+  K3.rect('couch3', 'sofa', 560, 1300, 650, 1430, TO_RIGHT),
+  circ('beanbag3', 'pouf', P3(690, 1290), 0.42),
+  // oriental folding screen standing in the open floor
+  K3.rect('divider3', 'divider', 560, 1130, 590, 1260, TO_RIGHT), // screens the lounge corner off the room
   ...parts3,
 ];
 

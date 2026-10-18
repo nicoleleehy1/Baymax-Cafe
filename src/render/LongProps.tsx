@@ -36,7 +36,7 @@ function usePropMats() {
   );
 }
 
-const ORIENTED = new Set<RectObstacle['visual']>(['bed', 'sofa', 'armchair', 'desk', 'workbench', 'stove', 'kitchenette', 'toilet']);
+const ORIENTED = new Set<RectObstacle['visual']>(['bed', 'sofa', 'armchair', 'desk', 'workbench', 'stove', 'kitchenette', 'toilet', 'workstation', 'divider']);
 const mid = (o: RectObstacle) => ({ x: (o.min.x + o.max.x) / 2, z: (o.min.y + o.max.y) / 2, w: o.max.x - o.min.x, d: o.max.y - o.min.y });
 
 export function LongProps({ obstacles }: { obstacles: Obstacle[] }) {
@@ -61,6 +61,30 @@ export function LongProps({ obstacles }: { obstacles: Obstacle[] }) {
               <mesh key={o.id} position={[o.c.x, 1.4, o.c.y]} material={m.woodDark} castShadow receiveShadow>
                 <cylinderGeometry args={[o.r, o.r * 1.1, 2.8, 24]} />
               </mesh>
+            );
+          case 'officeChair':
+            return (
+              <group key={o.id} position={[o.c.x, 0, o.c.y]} rotation={[0, -(o.facing ?? 0), 0]}>
+                <mesh position={[0, 0.03, 0]} material={m.black}>
+                  <cylinderGeometry args={[o.r, o.r, 0.04, 5]} />
+                </mesh>
+                <mesh position={[0, 0.25, 0]} material={m.steel}>
+                  <cylinderGeometry args={[0.025, 0.025, 0.45, 10]} />
+                </mesh>
+                <RoundedBox args={[0.42, 0.08, 0.42]} radius={0.04} position={[0, 0.47, 0]} material={m.black} castShadow />
+                <RoundedBox args={[0.1, 0.45, 0.4]} radius={0.04} position={[0.2, 0.75, 0]} material={m.black} castShadow />
+              </group>
+            );
+          case 'pouf':
+            return (
+              <group key={o.id} position={[o.c.x, 0, o.c.y]}>
+                <mesh position={[0, 0.2, 0]} scale={[1, 0.55, 1]} material={m.cushionAlt} castShadow receiveShadow>
+                  <sphereGeometry args={[o.r, 24, 16]} />
+                </mesh>
+                <mesh position={[0, 0.34, 0]} scale={[0.6, 0.25, 0.6]} material={m.cushionAlt} castShadow>
+                  <sphereGeometry args={[o.r, 20, 12]} />
+                </mesh>
+              </group>
             );
           case 'stool':
             return (
@@ -474,6 +498,86 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
           </mesh>
         </group>
       );
+    case 'workstation':
+      return (
+        <group position={[x, 0, z]}>
+          <RoundedBox args={[w, 0.05, d]} radius={0.02} position={[0, 0.74, 0]} material={m.woodLight} castShadow receiveShadow />
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[0, 0.36, (sd * (d - 0.1)) / 2]} material={m.woodDark} castShadow>
+              <boxGeometry args={[w - 0.1, 0.72, 0.05]} />
+            </mesh>
+          ))}
+          {/* two monitors on stands, angled slightly toward each other */}
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[w * 0.22, 0.77, sd * 0.36]} rotation={[0, -Math.PI / 2 + sd * 0.18, 0]}>
+              <mesh position={[0, 0.02, 0]} material={m.black}>
+                <cylinderGeometry args={[0.1, 0.12, 0.03, 16]} />
+              </mesh>
+              <mesh position={[0, 0.12, 0]} material={m.black}>
+                <boxGeometry args={[0.04, 0.2, 0.04]} />
+              </mesh>
+              <mesh position={[0, 0.36, 0]} material={m.black} castShadow>
+                <boxGeometry args={[0.6, 0.36, 0.03]} />
+              </mesh>
+              <mesh position={[0, 0.36, 0.017]}>
+                <planeGeometry args={[0.56, 0.32]} />
+                <meshBasicMaterial color="#9fd3e8" />
+              </mesh>
+            </group>
+          ))}
+          <mesh position={[-w * 0.12, 0.775, 0]} material={m.white}>
+            <boxGeometry args={[0.16, 0.02, 0.44]} />
+          </mesh>
+          <mesh position={[-w * 0.12, 0.78, 0.34]} material={m.white}>
+            <sphereGeometry args={[0.035, 12, 8]} />
+          </mesh>
+          {/* hardware: a case, a board, a soldering iron stand, loose chips */}
+          <RoundedBox args={[0.22, 0.4, 0.42]} radius={0.02} position={[w * 0.15, 0.97, -d * 0.42]} material={m.darkSteel} castShadow />
+          <mesh position={[-w * 0.3, 0.775, -d * 0.3]} material={m.cushionAlt}>
+            <boxGeometry args={[0.22, 0.015, 0.16]} />
+          </mesh>
+          <mesh position={[-w * 0.32, 0.8, d * 0.3]} material={m.steel}>
+            <cylinderGeometry args={[0.03, 0.04, 0.06, 10]} />
+          </mesh>
+          {[0, 1, 2].map((i) => (
+            <mesh key={i} position={[-w * 0.05 + i * 0.07, 0.775, -d * 0.1 + i * 0.05]} material={m.black}>
+              <boxGeometry args={[0.05, 0.012, 0.05]} />
+            </mesh>
+          ))}
+        </group>
+      );
+    case 'divider': {
+      // three lacquered panels with a lattice, standing in a shallow zigzag along the long side
+      const n = 3;
+      const panel = d / n;
+      return (
+        <group position={[x, 0, z]}>
+          {Array.from({ length: n }).map((_, i) => (
+            <group key={i} position={[(i % 2 ? 1 : -1) * w * 0.25, 0, -d / 2 + (i + 0.5) * panel]} rotation={[0, (i % 2 ? -1 : 1) * 0.28, 0]}>
+              <RoundedBox args={[0.04, 1.75, panel - 0.03]} radius={0.01} position={[0, 0.875, 0]} material={m.woodDark} castShadow receiveShadow />
+              <mesh position={[0.021, 0.95, 0]}>
+                <planeGeometry args={[panel - 0.12, 1.3]} />
+                <meshStandardMaterial color="#f3e4c4" roughness={0.9} side={THREE.DoubleSide} />
+              </mesh>
+              <mesh position={[-0.021, 0.95, 0]}>
+                <planeGeometry args={[panel - 0.12, 1.3]} />
+                <meshStandardMaterial color="#f3e4c4" roughness={0.9} side={THREE.DoubleSide} />
+              </mesh>
+              {[-0.3, 0, 0.3].map((t) => (
+                <mesh key={t} position={[0.03, 0.95 + t, 0]} material={m.woodDark}>
+                  <boxGeometry args={[0.012, 0.02, panel - 0.12]} />
+                </mesh>
+              ))}
+              {[-0.25, 0, 0.25].map((t) => (
+                <mesh key={t} position={[0.03, 0.95, t * (panel - 0.12)]} material={m.woodDark}>
+                  <boxGeometry args={[0.012, 1.3, 0.02]} />
+                </mesh>
+              ))}
+            </group>
+          ))}
+        </group>
+      );
+    }
     case 'workbench':
       return (
         <group position={[x, 0, z]}>
