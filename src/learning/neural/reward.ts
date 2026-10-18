@@ -1,4 +1,6 @@
-// Neural reward model: U(traj) = T · f_θ(descriptor(traj)), an MLP over trajectory descriptors.
+// Neural reward model: U(traj) = −delay(traj) + T · f_θ(descriptor(traj)), an MLP over trajectory
+// descriptors. As in the linear model, delay keeps a fixed weight of 1 as the unit of measure; it also
+// means no amount of fine-tuning can make waiting forever look free.
 //
 //  1. PRETRAIN (offline, `npm run neural:train`): distill the factory planner. For every recorded
 //     decision, match softmax(f_θ) over the safe candidates to softmax(U_factory / T) (listwise KL).
@@ -15,7 +17,8 @@ import { adamStep, backward, cloneMLP, createAdam, forward, forwardAll, zeroGrad
 /** Score scale: utilities come out in the same units as the linear planner's U = −w·φ. */
 export const T = 0.1;
 
-export const score = (net: MLP, x: ArrayLike<number>): number => T * forward(net, x);
+/** descriptor index 0 is the delay feature (×3 s), weight fixed at 1 */
+export const score = (net: MLP, x: ArrayLike<number>): number => -x[0] + T * forward(net, x);
 
 // ------------------------------------------------------------------ planning with the network
 
@@ -54,15 +57,30 @@ export interface Decision {
   u0: number[];
 }
 
-/** Listwise distillation loss for one decision; accumulates gradients into g when given. */
+/** weight of the centered utility-matching term (keeps far-apart options in the right order too) */
+export const DISTILL = { alpha: 5 };
+
+/**
+ * Distillation loss for one decision; accumulates gradients into g when given.
+ * Listwise KL between softmax(U/T) of network and factory sharpens the top choice; a centered
+ * squared error on the utilities keeps the gaps between clearly worse options, which matter
+ * when Baymax decides which alternative is worth asking about.
+ */
 export function distillLoss(net: MLP, d: Decision, g?: ReturnType<typeof zeroGrads>): { loss: number; top1: boolean; regret: number } {
+  const n = d.X.length;
   const acts = d.X.map((x) => forwardAll(net, x));
-  const s = acts.map((a) => a[a.length - 1][0]);
+  const s = acts.map((a, i) => a[a.length - 1][0] - d.X[i][0] / T); // = score / T
   const p = softmax(d.u0.map((u) => u / T));
   const q = softmax(s);
+  const mU = (T * s.reduce((x, y) => x + y, 0)) / n;
+  const m0 = d.u0.reduce((x, y) => x + y, 0) / n;
+  const r = s.map((si, i) => T * si - mU - (d.u0[i] - m0));
   let loss = 0;
-  for (let i = 0; i < s.length; i++) if (p[i] > 0) loss += p[i] * (Math.log(p[i]) - Math.log(q[i] + 1e-12));
-  if (g) for (let i = 0; i < s.length; i++) backward(net, acts[i], q[i] - p[i], g);
+  for (let i = 0; i < n; i++) {
+    if (p[i] > 0) loss += p[i] * (Math.log(p[i]) - Math.log(q[i] + 1e-12));
+    loss += (DISTILL.alpha * r[i] * r[i]) / n;
+  }
+  if (g) for (let i = 0; i < n; i++) backward(net, acts[i], q[i] - p[i] + (2 * DISTILL.alpha * T * r[i]) / n, g);
   // regret: how much factory utility is lost by taking the network's pick instead of the factory's
   return { loss, top1: argmax(s) === argmax(d.u0), regret: Math.max(...d.u0) - d.u0[argmax(s)] };
 }
@@ -75,7 +93,7 @@ export interface NeuralPreference {
 }
 
 /** steps/lr: Adam; lambda: L2-SP pull to the pretrained weights; mu: weight of the replay (rehearsal) term */
-export const FINETUNE = { steps: 150, lr: 2e-3, lambda: 0.02, mu: 1.0 };
+export const FINETUNE = { steps: 150, lr: 2e-3, lambda: 0.02, mu: 3 };
 
 export function prefProbNeural(net: MLP, ex: NeuralPreference): number {
   return sigmoid(score(net, ex.preferred) - score(net, ex.other));
@@ -103,7 +121,7 @@ export function fineTune(pretrained: MLP, examples: NeuralPreference[], o: Parti
     for (const ex of examples) {
       const ap = forwardAll(net, ex.preferred);
       const ao = forwardAll(net, ex.other);
-      const z = T * (ap[ap.length - 1][0] - ao[ao.length - 1][0]);
+      const z = -ex.preferred[0] + ex.other[0] + T * (ap[ap.length - 1][0] - ao[ao.length - 1][0]);
       const k = T * (1 - sigmoid(z)); // d(−log σ(z)) / d s_preferred = −k
       backward(net, ap, -k, g);
       backward(net, ao, k, g);
