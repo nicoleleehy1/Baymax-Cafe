@@ -267,7 +267,6 @@ const hiroObstacles: Obstacle[] = [
 const hiroDecor = [
   K3.rug('rugRound3', 570, 1270, 700, 1430, '#9bbfae', 'roundRug'),
   K3.rug('tileBath3', 100, 845, 298, 1128, '#efe6d2', 'tile'),
-  K3.rug('deck3', 172, 192, 798, 628, '#cdb79a', 'tile'),
 ];
 
 const deskC = P3(412, 1385);

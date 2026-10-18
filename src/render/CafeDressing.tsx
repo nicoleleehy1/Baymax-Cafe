@@ -122,14 +122,40 @@ function shaftTexture(): THREE.CanvasTexture {
  * Dressing for the traced café. `wall` is the interior wall the sign hangs on (the galley
  * partition behind the pastry cases): a segment along x plus the side (±y) it faces.
  */
+/** Pendant pools over the tables and sun shafts from the window side: the warm look for any storey. */
+export function WarmLighting({ def }: { def: LayoutDef }) {
+  const tex = useMemo(() => shaftTexture(), []);
+  const R = def.room;
+  return (
+    <group>
+      {def.tables
+        .filter((t) => t.seats.length > 0)
+        .map((t, i) => (
+          <group key={t.id} position={[t.c.x, 0, t.c.y]}>
+            <mesh position={[0, 2.38, 0]}>
+              <sphereGeometry args={[0.06, 12, 8]} />
+              <meshBasicMaterial color="#ffe1a8" />
+            </mesh>
+            {i % 2 === 0 && <pointLight position={[0, 2.25, 0]} intensity={2.2} distance={4.5} decay={2} color="#ffcf8a" />}
+          </group>
+        ))}
+      {[-5.5, -1.5, 2.5, 6.0].map((x) => (
+        <mesh key={x} position={[x, 1.3, R.maxY - 1.9]} rotation={[0.95, 0, 0]}>
+          <planeGeometry args={[1.6, 3.6]} />
+          <meshBasicMaterial map={tex} transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export function LongCafeDressing({ def, wall }: { def: LayoutDef; wall: { a: { x: number; y: number }; b: { x: number; y: number }; face: 1 | -1 } }) {
-  const tex = useMemo(() => ({ menu: menuTexture(), sign: signTexture(), shaft: shaftTexture() }), []);
+  const tex = useMemo(() => ({ menu: menuTexture(), sign: signTexture() }), []);
   // the wall runs along x (constant y) and its signage faces `face` along y: toward the camera
   const wy = wall.a.y + wall.face * 0.09;
   const xmid = (wall.a.x + wall.b.x) / 2;
   const wallLen = Math.abs(wall.b.x - wall.a.x);
   const rotY = wall.face > 0 ? 0 : Math.PI;
-  const R = def.room;
   return (
     <group>
       {/* green wainscot on the sign wall */}
@@ -145,25 +171,7 @@ export function LongCafeDressing({ def, wall }: { def: LayoutDef; wall: { a: { x
         <planeGeometry args={[1.4, 1.12]} />
         <meshStandardMaterial map={tex.menu} roughness={0.9} />
       </mesh>
-      {/* warm pendant pools over the tables (fixtures omitted so they never block the view) */}
-      {def.tables
-        .filter((t) => t.seats.length > 0)
-        .map((t, i) => (
-          <group key={t.id} position={[t.c.x, 0, t.c.y]}>
-            <mesh position={[0, 2.38, 0]}>
-              <sphereGeometry args={[0.06, 12, 8]} />
-              <meshBasicMaterial color="#ffe1a8" />
-            </mesh>
-            {i % 2 === 0 && <pointLight position={[0, 2.25, 0]} intensity={2.2} distance={4.5} decay={2} color="#ffcf8a" />}
-          </group>
-        ))}
-      {/* sun shafts from the window side (+y), as in the original */}
-      {[-5.5, -1.5, 2.5].map((x) => (
-        <mesh key={x} position={[x, 1.3, R.maxY - 1.9]} rotation={[0.95, 0, 0]}>
-          <planeGeometry args={[1.6, 3.6]} />
-          <meshBasicMaterial map={tex.shaft} transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
+      <WarmLighting def={def} />
     </group>
   );
 }

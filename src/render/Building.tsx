@@ -9,7 +9,7 @@ import { useApp } from '../state/store';
 import { BUILDING, FLOOR_HEIGHT, LAYOUT } from '../world/layout';
 import type { LayoutDef } from '../world/layoutTypes';
 import { RUG, SIGN_WALL } from '../world/layouts/long';
-import { LongCafeDressing, plankTexture } from './CafeDressing';
+import { LongCafeDressing, plankTexture, WarmLighting } from './CafeDressing';
 import { LongProps } from './LongProps';
 import { PALETTE, softMat } from './style/shapes';
 
@@ -41,7 +41,8 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
     [],
   );
   const R = def.room;
-  const floorTex = useMemo(() => (def.id === 'long' ? plankTexture((def.room.maxX - def.room.minX) / 4.9, (def.room.maxY - def.room.minY) / 4.9) : makeFloorTexture(def)), [def]);
+  // every storey shares the original café's oak planks (kitchen/bath tile and the roof deck sit on top as decor)
+  const floorTex = useMemo(() => plankTexture((def.room.maxX - def.room.minX) / 4.9, (def.room.maxY - def.room.minY) / 4.9), [def]);
   return (
     <group>
       {/* slab + finished floor */}
@@ -65,7 +66,7 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
           </mesh>
         );
       })}
-      {def.id === 'long' && <LongCafeDressing def={def} wall={SIGN_WALL} />}
+      {def.id === 'long' ? <LongCafeDressing def={def} wall={SIGN_WALL} /> : <WarmLighting def={def} />}
       {def.id === 'long' && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(RUG.min.x + RUG.max.x) / 2, 0.006, (RUG.min.y + RUG.max.y) / 2]} receiveShadow>
           <planeGeometry args={[RUG.max.x - RUG.min.x, RUG.max.y - RUG.min.y]} />
@@ -94,38 +95,6 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
       )}
     </group>
   );
-}
-
-function makeFloorTexture(def: LayoutDef): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const g = c.getContext('2d')!;
-  if (def.id === 'long') {
-    for (let i = 0; i < 8; i++)
-      for (let j = 0; j < 8; j++) {
-        g.fillStyle = (i + j) % 2 ? '#e6d6bd' : '#efe4d1';
-        g.fillRect(i * 32, j * 32, 32, 32);
-      }
-  } else if (def.id === 'cass') {
-    // warm plank floor
-    g.fillStyle = '#d8b48b';
-    g.fillRect(0, 0, 256, 256);
-    g.fillStyle = 'rgba(90,50,20,0.25)';
-    for (let r = 0; r < 8; r++) g.fillRect(0, r * 32, 256, 2);
-    for (let r = 0; r < 8; r++) g.fillRect(((r * 97) % 256), r * 32, 2, 32);
-  } else {
-    // rooftop deck boards + room carpet blend
-    g.fillStyle = '#cfc2a8';
-    g.fillRect(0, 0, 256, 256);
-    g.fillStyle = 'rgba(70,60,40,0.2)';
-    for (let r = 0; r < 16; r++) g.fillRect(r * 16, 0, 1, 256);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  const R = def.room;
-  t.repeat.set((R.maxX - R.minX) / 4, (R.maxY - R.minY) / 4);
-  return t;
 }
 
 function Rug({ d }: { d: NonNullable<LayoutDef['decor']>[number] }) {
