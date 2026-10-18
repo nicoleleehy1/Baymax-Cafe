@@ -143,9 +143,12 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
       min: v(g.x - (quarter ? g.d : g.w) / 2, g.z - (quarter ? g.w : g.d) / 2),
       max: v(g.x + (quarter ? g.d : g.w) / 2, g.z + (quarter ? g.w : g.d) / 2),
     };
-    // default props face +x (bed head at +x, sofa back at +x, desk/bench front at +x)
+    // `facing` is where a sitter looks (or foot→head for a bed). Beds/desks are authored with
+    // that direction along local +x; sofas and armchairs are authored with their BACK at +x,
+    // so they turn half a circle further.
+    const turn = o.visual === 'sofa' || o.visual === 'armchair' ? o.facing + Math.PI : o.facing;
     return (
-      <group position={[g.x, 0, g.z]} rotation={[0, -o.facing, 0]}>
+      <group position={[g.x, 0, g.z]} rotation={[0, -turn, 0]}>
         <group position={[-g.x, 0, -g.z]}>
           <RectProp o={inner} m={m} />
         </group>

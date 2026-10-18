@@ -101,7 +101,8 @@ const cassObstacles: Obstacle[] = [
   circ('D3', 'chair', at(P2(758, 1006), 0, -0.85), CHAIR_R, TO_RIGHT),
   circ('D4', 'chair', at(P2(758, 1006), 0, 0.85), CHAIR_R, TO_LEFT),
   // living room by the front bay
-  K2.rect('sofa2a', 'sofa', 510, 1275, 625, 1420, TO_RIGHT),
+  // both sofas sit along the front wall and face back into the living room
+  K2.rect('sofa2a', 'sofa', 510, 1275, 625, 1420, TO_BACK),
   K2.rect('sofa2b', 'sofa', 640, 1292, 845, 1410, TO_BACK),
   K2.rect('bay2', 'windowSeat', 850, 1150, 942, 1450),
   K2.rect('side2', 'squareTable', 830, 1115, 885, 1150),
@@ -139,8 +140,8 @@ const dineSeats: Seat[] = [
 const sofaA = P2(562, 1347);
 const sofaB = P2(742, 1351);
 const sofaSeats: Seat[] = [
-  { id: 'S1', pos: at(sofaA, -0.45, 0.1), facing: TO_RIGHT },
-  { id: 'S2', pos: at(sofaA, 0.45, 0.1), facing: TO_RIGHT },
+  { id: 'S1', pos: at(sofaA, 0.1, -0.4), facing: TO_BACK },
+  { id: 'S2', pos: at(sofaA, 0.1, 0.4), facing: TO_BACK },
 ];
 const sofaBSeats: Seat[] = [{ id: 'AC', pos: at(sofaB, 0.1, 0.0), facing: TO_BACK }];
 const bedC = P2(315, 1337);
