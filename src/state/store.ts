@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { PlanResult, PreferenceModelState, UpdateReport } from '../core/types';
 import type { BeforeAfter } from '../eval/runner';
 import { createModel } from '../learning/model';
+import type { Brain } from '../learning/neural/runtime';
 import type { Metrics } from '../sim/metrics';
 import type { ScenarioId } from '../sim/scenarios';
 
@@ -42,6 +43,8 @@ export interface AppState {
   view: ViewMode;
   replayActive: boolean;
   askEnabled: boolean;
+  /** which reward model scores Baymax's options: six linear weights, or the pretrained neural network */
+  brain: Brain;
   model: PreferenceModelState;
   modelLoaded: boolean;
   query: PlanResult | null;
@@ -62,12 +65,18 @@ export interface AppState {
 
 let lineId = 0;
 
+function initialBrain(): Brain {
+  const g = globalThis as { location?: { search: string } };
+  return g.location && new URLSearchParams(g.location.search).get('brain') === 'neural' ? 'neural' : 'linear';
+}
+
 export const useApp = create<AppState>((set) => ({
   scenarioId: 'teach',
   runState: 'ready',
   view: 'cafe',
   replayActive: false,
   askEnabled: true,
+  brain: initialBrain(),
   model: createModel(),
   modelLoaded: false,
   query: null,

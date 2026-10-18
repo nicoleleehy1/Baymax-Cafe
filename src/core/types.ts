@@ -137,6 +137,9 @@ export interface PreferenceExample {
   labelB: string;
   /** 'A' or 'B' */
   preferred: 'A' | 'B';
+  /** neural reward model inputs for the two options (absent on answers saved before it existed) */
+  descA?: number[];
+  descB?: number[];
 }
 
 export interface PreferenceModelState {
@@ -156,4 +159,6 @@ export interface UpdateReport {
   probAfter: number;
   rankBefore: { preferred: number; other: number }; // utilities
   rankAfter: { preferred: number; other: number };
+  /** set when the neural reward model was fine-tuned on this answer */
+  neural?: { probBefore: number; probAfter: number; ms: number };
 }

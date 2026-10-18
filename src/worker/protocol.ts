@@ -3,13 +3,19 @@ import type { PlanResult, PreferenceExample, PreferenceModelState, UpdateReport 
 import type { PlanInput } from '../planning/planner';
 import type { ScenarioId } from '../sim/scenarios';
 import type { BeforeAfter } from '../eval/runner';
+import type { NeuralPreference } from '../learning/neural/reward';
 
 export const PROTOCOL_VERSION = 1;
 
 export type ToWorker =
-  | { v: 1; type: 'plan'; input: PlanInput }
-  | { v: 1; type: 'learn'; jobId: number; model: PreferenceModelState; example: PreferenceExample }
-  | { v: 1; type: 'evaluate'; jobId: number; scenarioId: ScenarioId; initialWeights: number[]; learnedWeights: number[] };
+  | { v: 1; type: 'plan'; input: PlanInput; neural?: NeuralSpec }
+  | { v: 1; type: 'learn'; jobId: number; model: PreferenceModelState; example: PreferenceExample; neural?: NeuralSpec }
+  | { v: 1; type: 'evaluate'; jobId: number; scenarioId: ScenarioId; initialWeights: number[]; learnedWeights: number[]; neural?: NeuralSpec };
+
+/** present when the neural reward model scores plans: every answer so far, as descriptor pairs */
+export interface NeuralSpec {
+  prefs: NeuralPreference[];
+}
 
 export type FromWorker =
   | { v: 1; type: 'plan'; result: PlanResult }
