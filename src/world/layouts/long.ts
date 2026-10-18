@@ -68,6 +68,9 @@ const porch: Vec2[] = [DOOR_A, DOOR_B, at(DOOR_B, outN.x, outN.y), at(DOOR_A, ou
 
 // interior walls (rendered + navigation): kitchen wall, galley partition, office, restroom
 const KITCHEN_WALL_Y_END = P(495, 465).y;
+/** the café-side face of the galley partition: where the sign and menu hang */
+export const SIGN_WALL = { a: P(215, 480), b: P(215, 1000), face: 1 as const };
+
 const interiorWalls: { a: Vec2; b: Vec2 }[] = [
   { a: P(215, 465), b: P(495, 465) }, // kitchen / café wall (the pastry shelf hangs on it)
   { a: P(215, 435), b: P(215, 1000) }, // galley partition

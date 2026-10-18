@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { useApp } from '../state/store';
 import { BUILDING, FLOOR_HEIGHT, LAYOUT } from '../world/layout';
 import type { LayoutDef } from '../world/layoutTypes';
-import { RUG } from '../world/layouts/long';
+import { RUG, SIGN_WALL } from '../world/layouts/long';
+import { LongCafeDressing, plankTexture } from './CafeDressing';
 import { LongProps } from './LongProps';
 import { PALETTE, softMat } from './style/shapes';
 
@@ -40,7 +41,7 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
     [],
   );
   const R = def.room;
-  const floorTex = useMemo(() => makeFloorTexture(def), [def]);
+  const floorTex = useMemo(() => (def.id === 'long' ? plankTexture((def.room.maxX - def.room.minX) / 4.9, (def.room.maxY - def.room.minY) / 4.9) : makeFloorTexture(def)), [def]);
   return (
     <group>
       {/* slab + finished floor */}
@@ -64,6 +65,7 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
           </mesh>
         );
       })}
+      {def.id === 'long' && <LongCafeDressing def={def} wall={SIGN_WALL} />}
       {def.id === 'long' && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(RUG.min.x + RUG.max.x) / 2, 0.006, (RUG.min.y + RUG.max.y) / 2]} receiveShadow>
           <planeGeometry args={[RUG.max.x - RUG.min.x, RUG.max.y - RUG.min.y]} />

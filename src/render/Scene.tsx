@@ -66,7 +66,7 @@ function Lights() {
       <ambientLight intensity={0.18} color="#ffd9a8" />
       <directionalLight
         ref={sun}
-        position={LAYOUT_ID === 'classic' ? [13, 8.5, 1.5] : [3, 10, 9]}
+        position={LAYOUT_ID === 'classic' ? [13, 8.5, 1.5] : [2, 8.5, 13]}
         intensity={3.1}
         color="#ffdcae"
         castShadow
