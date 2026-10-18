@@ -9,11 +9,12 @@
 import type { PlanResult } from '../core/types';
 import { exampleFromQuery } from '../eval/runner';
 import { createModel, isCompatible } from '../learning/model';
+import { neuralPreferences, withDescriptors, type Brain } from '../learning/neural/runtime';
 import { loadModel, saveModel, saveRun } from '../persistence/db';
 import { SIM_DT, SimEngine } from '../sim/engine';
 import type { Frame } from '../sim/metrics';
 import { SCENARIOS, type ScenarioId } from '../sim/scenarios';
-import { PROTOCOL_VERSION, type FromWorker, type ToWorker } from '../worker/protocol';
+import { PROTOCOL_VERSION, type FromWorker, type NeuralSpec, type ToWorker } from '../worker/protocol';
 import { jobIsFresh, planIsFresh, type JobTicket } from './freshness';
 import { useApp } from './store';
 import { LAYOUT_ID } from '../world/layout';
@@ -139,6 +140,26 @@ export class Controller {
     if (useApp.getState().runState === 'ready') useApp.getState().set({ runState: 'running' });
   }
 
+  /** Switch reward model. Answers are kept: both models learn from every answer. */
+  setBrain(brain: Brain): void {
+    const s = useApp.getState();
+    if (s.brain === brain) return;
+    this.modelRevision++; // drop plans and jobs scored with the other model
+    this.learnTicket = null;
+    this.evalTicket = null;
+    s.set({ brain, evidence: null, evaluation: { status: 'idle' }, replayActive: false });
+    s.say('system', brain === 'neural' ? 'Scoring with the neural reward model (pretrained, fine-tuned from your answers).' : 'Scoring with the six linear weights.', this.engine.t);
+    if (s.runState === 'teaching' || s.runState === 'learning') {
+      s.set({ query: null });
+      this.replanAndResume();
+    } else this.engine.lastPlanReqT = -Infinity;
+  }
+
+  private neuralSpec(): NeuralSpec | undefined {
+    const s = useApp.getState();
+    return s.brain === 'neural' ? { prefs: neuralPreferences(s.model.examples) } : undefined;
+  }
+
   resetPreferences(): void {
     const s = useApp.getState();
     const m = createModel();
@@ -214,6 +235,7 @@ export class Controller {
         stuckFor: eng.robot.stuckFor,
         allowQuery,
       },
+      neural: this.neuralSpec(),
     });
   }
 
@@ -327,10 +349,10 @@ export class Controller {
       return;
     }
     s.set({ runState: 'learning' });
-    const ex = exampleFromQuery(q, s.scenarioId, choice);
+    const ex = withDescriptors(exampleFromQuery(q, s.scenarioId, choice), q);
     const jobId = ++this.jobCounter;
     this.learnTicket = { jobId, epoch: this.engine.epoch, modelRevision: this.modelRevision };
-    this.send({ v: PROTOCOL_VERSION, type: 'learn', jobId, model: s.model, example: ex });
+    this.send({ v: PROTOCOL_VERSION, type: 'learn', jobId, model: s.model, example: ex, neural: this.neuralSpec() });
   }
 
   private replanAndResume(): void {
@@ -355,7 +377,7 @@ export class Controller {
     const jobId = ++this.jobCounter;
     this.evalTicket = { jobId, epoch: this.engine.epoch, modelRevision: this.modelRevision, scenarioId };
     s.set({ evaluation: { status: 'running' } });
-    this.send({ v: PROTOCOL_VERSION, type: 'evaluate', jobId, scenarioId, initialWeights: s.model.initialWeights, learnedWeights: s.model.weights });
+    this.send({ v: PROTOCOL_VERSION, type: 'evaluate', jobId, scenarioId, initialWeights: s.model.initialWeights, learnedWeights: s.model.weights, neural: this.neuralSpec() });
   }
 
   closeReplay(): void {

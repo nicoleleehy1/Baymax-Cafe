@@ -32,7 +32,7 @@ An interactive 3D café where a Baymax-inspired robot delivers drinks around cus
 - **Hard safety first, preferences second.** Any candidate that comes within a margin of a predicted person or touches static geometry is rejected before scoring. If nothing survives, Baymax brakes. Learning can't touch this layer.
 - **Preference learning:** six normalized cost features (delay, closeness to people, conversation intrusion, speed near people, aisle blocking, abrupt motion), utility U = −w·φ, and a Bradley-Terry model P(A ≻ B) = σ(U(A) − U(B)) refit on every stored answer by gradient descent with a pull back toward the initial weights. The delay weight is fixed at 1 as the unit of measure, so every other weight reads as "how many 3-second units of delay Baymax will accept to avoid one unit of this cost."
 - **When to ask:** an active-learning heuristic. Baymax asks only when the chosen option and the best option from a different behavior class are both safe, score within 1.2 of each other, differ meaningfully in social features, and a person is nearby, with at most 2 questions per run.
-- **Neural reward model, pretrained then fine-tuned** (`src/learning/neural`). A second learner, run headlessly so far: a 46→32→32→1 MLP (2,593 parameters, hand-written backprop and Adam, no ML library) scores each candidate from a richer descriptor than the six features: a 10-step timeline of closeness to predicted people, speed and aisle occupancy, meters through conversation areas over the whole route, and the maneuver type. Its utility is U = −delay + 0.1·f_θ(x), so delay keeps its fixed weight as the unit of measure, just like the linear model.
+- **Neural reward model, pretrained then fine-tuned** (`src/learning/neural`). A second learner, selectable in the app: a 46→32→32→1 MLP (2,593 parameters, hand-written backprop and Adam, no ML library) scores each candidate from a richer descriptor than the six features: a 10-step timeline of closeness to predicted people, speed and aisle occupancy, meters through conversation areas over the whole route, and the maneuver type. Its utility is U = −delay + 0.1·f_θ(x), so delay keeps its fixed weight as the unit of measure, just like the linear model.
   - *Pretraining:* we recorded 15,698 decisions from the factory planner across all four floors, with randomly perturbed weights so Baymax visits varied states. The network is distilled from three floors (11,954 decisions, listwise KL plus a centered utility-matching loss). The top floor stays held out.
   - *Fine-tuning:* each answer trains the network with the same Bradley-Terry loss, P(A ≻ B) = σ(U(A) − U(B)), starting from the pretrained weights. Two terms keep it from forgetting: an L2 pull toward the pretrained parameters, and a 96-situation replay set where every option crosses conversations equally, which the network must keep ranking as before. This is the same pretrain, then preference-tune, then stay-close-to-the-reference recipe used for LLMs, at robot scale. One fine-tune takes about 2 s in Node.
   - Hard safety is unchanged. The network only re-ranks candidates that already passed collision rejection; a test runs a deliberately random network and checks it never picks an unsafe one.
@@ -72,7 +72,7 @@ From `npm run eval:neural`, again with one scripted answer per floor. On the caf
 - **One answer generalizes on every floor:** fine-tuning on the floor's own Teach question removes conversation intrusions in both Teach and Generalize on all four floors (8 of 8 runs), Adapt is unchanged, and every delivery completes with zero collisions.
 - **Held-out preference pairs:** among recorded options that differ by more than 0.3 m of conversation and less than 3 s of delay, the network ranks the less intrusive one higher 11 to 21% of the time before fine-tuning and 96 to 100% after. On pairs that don't involve conversations, 88 to 95% keep their pretrained order.
 - **Where it is weaker than the linear model:** it is slower to deliver (the floor-2 Generalize run takes 37.8 s against 12.8 s, as Baymax waits out a crowded passage). A network fine-tuned on the café and carried upstairs unchanged removes intrusions in 3 of 6 runs, while the six-weight linear model transfers in all of them. With one answer, the simpler model generalizes better across rooms. Planning with the network costs about 10 ms per update against about 5 ms.
-- **Not in the interactive app yet:** the app still learns with the linear model. The network runs in the eval and tests, in code that already works inside a Web Worker.
+- **In the app:** the top bar's Model selector (or `?brain=neural`) switches Baymax to the network. Both models learn from every answer; the network fine-tunes in the planning worker in about 1.5 s and the evidence card shows its P(your choice) moving. Full write-up: `docs/neural-reward-findings.md`.
 
 ## Challenges we ran into
 
@@ -102,7 +102,7 @@ From `npm run eval:neural`, again with one scripted answer per floor. On the caf
 
 We want to be clear about this:
 
-- **Learned from your answers:** the weights on closeness, conversation intrusion, speed near people, aisle blocking and abrupt motion (linear model, in the app); all 2,593 network parameters during fine-tuning (neural model, headless).
+- **Learned from your answers:** the weights on closeness, conversation intrusion, speed near people, aisle blocking and abrupt motion (linear model, in the app); all 2,593 network parameters during fine-tuning (neural model).
 - **Learned offline:** the neural model's pretrained weights, distilled from the factory planner's recorded decisions. Its descriptor, architecture and loss terms are authored.
 - **Authored by us:** the feature definitions, initial weights, the delay weight (scale anchor), café geometry, customer scripts, collision margins, dynamics limits, route hysteresis and all dialogue templates.
 - **Conversation groups are authored scene annotations**, not perceived from body language.
@@ -113,7 +113,7 @@ We want to be clear about this:
 ## What's next for After You
 
 - Visual detection of conversation groups (F-formations) instead of annotations.
-- Wire the neural reward model into the interactive app, with a toggle against the linear model, and fine-tune it in the planning worker from the same answers.
+- Pretrain the network on many simulated teachers with different tastes, so one answer moves it further and transfers between rooms as well as the linear model does.
 - Context-dependent preferences (a busy lunch rush versus a quiet afternoon), which the neural model's richer input makes possible.
 - Smarter questions using expected information gain over a posterior on the weights, instead of a score-closeness heuristic.
 - ORCA for customers and learned human trajectory forecasting.

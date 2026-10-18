@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CandidateSummary, PlanResult } from '../core/types';
 import { FEATURES, LEARNED } from '../learning/model';
+import { neuralPreferences, PARAMS, type Brain } from '../learning/neural/runtime';
 import { METRIC_DEFS, type Metrics } from '../sim/metrics';
 import { SCENARIO_ORDER, SCENARIOS, type ScenarioId } from '../sim/scenarios';
 import { controller } from '../state/controller';
@@ -19,6 +20,7 @@ export function TopBar() {
   const runState = useApp((s) => s.runState);
   const view = useApp((s) => s.view);
   const askEnabled = useApp((s) => s.askEnabled);
+  const brain = useApp((s) => s.brain);
   const evaluation = useApp((s) => s.evaluation);
   const examples = useApp((s) => s.model.examples.length);
   const phase = useApp((s) => s.hud.phase);
@@ -84,6 +86,13 @@ export function TopBar() {
         <label className="toggle" title="Active learning: Baymax may pause and ask when two safe options score closely but differ socially.">
           <input type="checkbox" checked={askEnabled} onChange={(e) => set({ askEnabled: e.target.checked })} />
           Let Baymax ask
+        </label>
+        <label className="toggle" title="Which reward model ranks Baymax's safe options. Both learn from every answer; the neural network is pretrained and fine-tuned from your answers.">
+          Model
+          <select value={brain} onChange={(e) => controller.setBrain(e.target.value as Brain)} aria-label="Reward model">
+            <option value="linear">6 linear weights</option>
+            <option value="neural">Neural network</option>
+          </select>
         </label>
         <button className="btn" disabled={evaluation.status === 'running'} onClick={() => controller.evaluate()}>
           {evaluation.status === 'running' ? 'Evaluating…' : 'Before / after replay'}
@@ -255,6 +264,11 @@ export function EvidenceCard() {
         <span className="chg">
           P(your choice) {(r.probBefore * 100).toFixed(0)}% → <b>{(r.probAfter * 100).toFixed(0)}%</b>
         </span>
+        {r.neural && (
+          <span className="chg" title={`All ${PARAMS} network parameters were fine-tuned from the pretrained weights in ${(r.neural.ms / 1000).toFixed(1)} s`}>
+            Neural net P(your choice) {(r.neural.probBefore * 100).toFixed(0)}% → <b>{(r.neural.probAfter * 100).toFixed(0)}%</b>
+          </span>
+        )}
       </div>
       <button className="btn ghost small inspector-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
         {open ? 'Hide details' : 'Inspect the update'}
@@ -305,10 +319,17 @@ export function ConsideringPanel() {
   const weights = useApp((s) => s.model.weights);
   const initial = useApp((s) => s.model.initialWeights);
   const replayActive = useApp((s) => s.replayActive);
+  const brain = useApp((s) => s.brain);
+  const answers = useApp((s) => neuralPreferences(s.model.examples).length);
   if (view !== 'considering' || replayActive) return null;
   return (
     <aside className="considering card">
       <div className="eyebrow">What Baymax is considering</div>
+      {brain === 'neural' && (
+        <p className="muted">
+          Ranked by the neural reward model ({PARAMS} parameters, pretrained on the factory planner{answers ? `, fine-tuned on ${answers} answer${answers === 1 ? '' : 's'}` : ''}). The cost breakdown uses the linear weights for reference.
+        </p>
+      )}
       {!plan || plan.chosen < 0 ? (
         <p className="muted">Assign a delivery to see candidate trajectories.</p>
       ) : (
@@ -415,6 +436,8 @@ export function EvaluationPanel() {
   const active = useApp((s) => s.replayActive);
   const weights = useApp((s) => s.model.weights);
   const initial = useApp((s) => s.model.initialWeights);
+  const brain = useApp((s) => s.brain);
+  const neuralAnswers = useApp((s) => neuralPreferences(s.model.examples).length);
   const [, force] = useState(0);
   useEffect(() => {
     if (!active) return;
@@ -424,12 +447,15 @@ export function EvaluationPanel() {
   if (!active || ev.status !== 'done' || !ev.result) return null;
   const r = ev.result;
   const clock = controller.replay;
-  const same = weights.every((w, i) => Math.abs(w - initial[i]) < 1e-6);
+  const same = brain === 'neural' ? neuralAnswers === 0 : weights.every((w, i) => Math.abs(w - initial[i]) < 1e-6);
   return (
     <div className="evaluation card">
       <div className="card-head">
         <div>
-          <div className="eyebrow">Controlled before / after · {SCENARIOS[r.scenarioId].title}</div>
+          <div className="eyebrow">
+            Controlled before / after · {SCENARIOS[r.scenarioId].title}
+            {brain === 'neural' ? ' · neural network, pretrained vs fine-tuned' : ''}
+          </div>
           <div className="evidence-title">Same recorded customer motion for both runs {r.identicalCustomers ? '✓' : '✗'}</div>
         </div>
         <button className="icon-btn" onClick={() => controller.closeReplay()} aria-label="Close replay">
