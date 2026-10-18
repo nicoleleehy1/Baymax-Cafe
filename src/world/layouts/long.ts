@@ -23,8 +23,9 @@ const pwl = (pts: [number, number][]) => (p: number): number => {
   return B + (p - b) * ((B - A) / (b - a));
 };
 // plan y (px, top→bottom) → depth along the café (m)
-// (the ordering area below the counter's top arm is opened up by ~1 m so a pair can stand and talk there)
-const depth = pwl([[150, 0], [465, 3.6], [495, 3.9], [615, 4.85], [705, 5.7], [760, 7.15], [837, 8.45], [895, 9.05], [953, 9.75], [1010, 10.75], [1075, 11.5], [1178, 12.55], [1325, 14.45], [1395, 15.15], [1525, 17.1]]);
+// (the ordering area below the counter's top arm is opened up so a pair can stand and talk there;
+//  the whole length is compressed ×0.8 — the movie's café is compact, closer to square than the plan)
+const depth = pwl([[150, 0.0], [465, 2.88], [495, 3.12], [615, 3.88], [705, 4.56], [760, 5.72], [837, 6.76], [895, 7.24], [953, 7.8], [1010, 8.6], [1075, 9.2], [1178, 10.04], [1325, 11.56], [1395, 12.12], [1525, 13.68]]);
 // plan x (px, left→right) → width across the café (m)
 // (aisles get extra room: seated customers' bodies stick out past their chairs)
 const across = pwl([[35, 0], [215, 2.2], [290, 3.0], [385, 3.8], [470, 5.7], [535, 6.36], [600, 7.02], [655, 9.05], [722, 9.77], [790, 10.42], [810, 10.72]]);

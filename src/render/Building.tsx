@@ -34,7 +34,7 @@ export function Building() {
 function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
   const mats = useMemo(
     () => ({
-      wall: softMat(PALETTE.cream, { roughness: 0.95 }),
+      wall: softMat(def.id === 'long' ? '#b9cf9f' : PALETTE.cream, { roughness: 0.95 }), // the café's sage interior
       slab: new THREE.MeshStandardMaterial({ color: '#cbb79b', roughness: 0.95 }),
       veil: new THREE.MeshBasicMaterial({ color: '#2a211c', transparent: true, opacity: 0.35, depthWrite: false }),
     }),

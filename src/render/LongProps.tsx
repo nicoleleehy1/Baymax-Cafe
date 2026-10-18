@@ -19,6 +19,11 @@ function usePropMats() {
       wood: softMat(PALETTE.wood, { roughness: 0.65 }),
       woodLight: softMat(PALETTE.woodLight, { roughness: 0.6 }),
       woodDark: softMat(PALETTE.woodDark, { roughness: 0.7 }),
+      cherry: softMat('#6e2f24', { roughness: 0.55, sheen: 0.3 }),
+      marble: softMat('#f1ece4', { roughness: 0.3, sheen: 0.2 }),
+      catWhite: softMat('#fbf8f2', { roughness: 0.5 }),
+      catRed: new THREE.MeshStandardMaterial({ color: '#c9412f', roughness: 0.7 }),
+      bread: softMat('#c98a4a', { roughness: 0.85 }),
       cream: softMat(PALETTE.cream),
       stone: softMat('#efe9df', { roughness: 0.4 }),
       glass: new THREE.MeshPhysicalMaterial({ color: '#eaf4f6', roughness: 0.05, transparent: true, opacity: 0.22, depthWrite: false }),
@@ -278,9 +283,13 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
             const px = w >= d ? t * w : 0;
             const pz = w >= d ? 0 : t * d;
             return (
-              <mesh key={i} position={[px, y, pz]} material={o.visual === 'dishRack' ? m.white : m.pastry[i % 6]} castShadow>
-                <cylinderGeometry args={[0.07, 0.06, o.visual === 'dishRack' ? 0.14 : 0.2, 14]} />
-              </mesh>
+              o.id === 'wallDisplay' ? (
+                <CatBread key={i} m={m} position={[px, y + 0.02, pz]} seed={i} />
+              ) : (
+                <mesh key={i} position={[px, y, pz]} material={o.visual === 'dishRack' ? m.white : m.pastry[i % 6]} castShadow>
+                  <cylinderGeometry args={[0.07, 0.06, o.visual === 'dishRack' ? 0.14 : 0.2, 14]} />
+                </mesh>
+              )
             );
           })}
         </group>
@@ -288,8 +297,27 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
     case 'counter':
       return (
         <group position={[x, 0, z]}>
-          <RoundedBox args={[w, 1.0, d]} radius={0.03} position={[0, 0.5, 0]} material={m.woodDark} castShadow receiveShadow />
-          <RoundedBox args={[w + 0.06, 0.05, d + 0.06]} radius={0.02} position={[0, 1.02, 0]} material={m.stone} castShadow receiveShadow />
+          <RoundedBox args={[w, 1.0, d]} radius={0.03} position={[0, 0.5, 0]} material={m.cherry} castShadow receiveShadow />
+          {/* raised panel trim, as on the movie's cherry counter */}
+          {Array.from({ length: Math.max(1, Math.floor(Math.max(w, d) / 0.7)) }).map((_, i) => {
+            const n = Math.max(1, Math.floor(Math.max(w, d) / 0.7));
+            const t = ((i + 0.5) / n - 0.5) * Math.max(w, d);
+            const alongX = w >= d;
+            return (
+              <mesh key={i} position={[alongX ? t : w / 2 + 0.005, 0.5, alongX ? d / 2 + 0.005 : t]} rotation={[0, alongX ? 0 : Math.PI / 2, 0]} material={m.woodDark}>
+                <boxGeometry args={[0.5, 0.6, 0.012]} />
+              </mesh>
+            );
+          })}
+          <RoundedBox args={[w + 0.06, 0.05, d + 0.06]} radius={0.02} position={[0, 1.02, 0]} material={m.marble} castShadow receiveShadow />
+          {o.id === 'counterArm' && (
+            <group position={[0, 1.05, -d * 0.1]}>
+              <LuckyCat m={m} scale={1} />
+              <group position={[0.25, 0, 0.1]}>
+                <LuckyCat m={m} scale={0.6} />
+              </group>
+            </group>
+          )}
           {o.id === 'counterArm' && (
             <>
               <mesh position={[0, 1.14, -d * 0.3]} material={m.black}>
@@ -315,8 +343,8 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
     case 'pastryCase':
       return (
         <group position={[x, 0, z]}>
-          <RoundedBox args={[w, 0.8, d]} radius={0.03} position={[0, 0.4, 0]} material={m.woodDark} castShadow receiveShadow />
-          <mesh position={[0, 0.82, 0]} material={m.stone}>
+          <RoundedBox args={[w, 0.8, d]} radius={0.03} position={[0, 0.4, 0]} material={m.cherry} castShadow receiveShadow />
+          <mesh position={[0, 0.82, 0]} material={m.marble}>
             <boxGeometry args={[w + 0.04, 0.04, d + 0.04]} />
           </mesh>
           <mesh position={[0, 1.1, 0]} material={m.glass}>
@@ -353,8 +381,8 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
     case 'dishCounter':
       return (
         <group position={[x, 0, z]}>
-          <RoundedBox args={[w, 0.9, d]} radius={0.03} position={[0, 0.45, 0]} material={m.woodDark} castShadow receiveShadow />
-          <mesh position={[0, 0.92, 0]} material={m.stone}>
+          <RoundedBox args={[w, 0.9, d]} radius={0.03} position={[0, 0.45, 0]} material={m.cherry} castShadow receiveShadow />
+          <mesh position={[0, 0.92, 0]} material={m.marble}>
             <boxGeometry args={[w + 0.04, 0.04, d + 0.04]} />
           </mesh>
           {[0, 1, 2].map((i) => (
@@ -367,8 +395,8 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
     case 'espressoBar':
       return (
         <group position={[x, 0, z]}>
-          <RoundedBox args={[w, 1.0, d]} radius={0.03} position={[0, 0.5, 0]} material={m.woodDark} castShadow receiveShadow />
-          <RoundedBox args={[w + 0.06, 0.05, d + 0.06]} radius={0.02} position={[0, 1.02, 0]} material={m.stone} castShadow />
+          <RoundedBox args={[w, 1.0, d]} radius={0.03} position={[0, 0.5, 0]} material={m.cherry} castShadow receiveShadow />
+          <RoundedBox args={[w + 0.06, 0.05, d + 0.06]} radius={0.02} position={[0, 1.02, 0]} material={m.marble} castShadow />
           <group position={[0, 1.05, -d * 0.25]}>
             <RoundedBox args={[0.5, 0.42, 0.55]} radius={0.03} position={[0, 0.21, 0]} material={m.steel} castShadow />
             <mesh position={[0, 0.44, 0]} material={m.black}>
@@ -734,3 +762,47 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
 }
 
 export { CHAIR_SEAT_Y };
+
+/** Maneki-neko: the beckoning lucky cat on the counter. */
+function LuckyCat({ m, scale }: { m: Mats; scale: number }) {
+  return (
+    <group scale={scale}>
+      <mesh position={[0, 0.1, 0]} scale={[1, 1.1, 0.9]} material={m.catWhite} castShadow>
+        <sphereGeometry args={[0.095, 20, 14]} />
+      </mesh>
+      <mesh position={[0, 0.245, 0]} scale={[1.05, 0.9, 1]} material={m.catWhite} castShadow>
+        <sphereGeometry args={[0.078, 20, 14]} />
+      </mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * 0.05, 0.31, 0]} rotation={[0, 0, sd * -0.5]} material={m.catWhite}>
+          <coneGeometry args={[0.025, 0.05, 8]} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.2, 0.06]} rotation={[Math.PI / 2, 0, 0]} material={m.catRed}>
+        <torusGeometry args={[0.062, 0.012, 8, 24]} />
+      </mesh>
+      <mesh position={[0.085, 0.27, 0.03]} rotation={[0, 0, 0.35]} material={m.catWhite} castShadow>
+        <capsuleGeometry args={[0.02, 0.09, 4, 10]} />
+      </mesh>
+      <mesh position={[-0.05, 0.12, 0.085]} rotation={[Math.PI / 2, 0, 0]} material={m.pastry[2]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.01, 16]} />
+      </mesh>
+    </group>
+  );
+}
+
+/** A lucky-cat-shaped bread loaf (the café's signature bake). */
+function CatBread({ m, position, seed }: { m: Mats; position: [number, number, number]; seed: number }) {
+  return (
+    <group position={position} rotation={[0, (seed % 3) * 0.4 - 0.4, 0]}>
+      <mesh position={[0, 0.06, 0]} scale={[1, 0.8, 0.75]} material={m.bread} castShadow>
+        <sphereGeometry args={[0.075, 14, 10]} />
+      </mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * 0.04, 0.12, 0]} material={m.bread}>
+          <coneGeometry args={[0.018, 0.035, 6]} />
+        </mesh>
+      ))}
+    </group>
+  );
+}

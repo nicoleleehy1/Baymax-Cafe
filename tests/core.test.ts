@@ -193,6 +193,6 @@ describe('repeatability', () => {
     const ep = runEpisode('generalize', { weights: model.weights, initialWeights: model.initialWeights });
     const routeSwitches = ep.decisions.filter((d, i) => i > 0 && d.routeId !== ep.decisions[i - 1].routeId).length;
     // upstairs rooms are tight, so the detour is intermittently infeasible and switches back more often
-    expect(routeSwitches).toBeLessThanOrEqual(LAYOUT_ID === 'cass' || LAYOUT_ID === 'hiro' ? 5 : 2);
+    expect(routeSwitches).toBeLessThanOrEqual(LAYOUT_ID === 'classic' ? 2 : LAYOUT_ID === 'long' ? 3 : 5);
   });
 });

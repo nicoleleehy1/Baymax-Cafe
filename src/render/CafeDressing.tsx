@@ -132,9 +132,14 @@ export function WarmLighting({ def }: { def: LayoutDef }) {
         .filter((t) => t.seats.length > 0)
         .map((t, i) => (
           <group key={t.id} position={[t.c.x, 0, t.c.y]}>
-            <mesh position={[0, 2.38, 0]}>
-              <sphereGeometry args={[0.06, 12, 8]} />
-              <meshBasicMaterial color="#ffe1a8" />
+            {/* a paper lantern on a cord, as in the movie's café */}
+            <mesh position={[0, 2.85, 0]}>
+              <cylinderGeometry args={[0.004, 0.004, 0.5, 6]} />
+              <meshStandardMaterial color="#2b2321" />
+            </mesh>
+            <mesh position={[0, 2.42, 0]} scale={[1, 1.5, 1]}>
+              <sphereGeometry args={[0.13, 16, 12]} />
+              <meshStandardMaterial color="#fff0cf" emissive="#ffd9a0" emissiveIntensity={0.8} roughness={0.9} />
             </mesh>
             {i % 2 === 0 && <pointLight position={[0, 2.25, 0]} intensity={2.2} distance={4.5} decay={2} color="#ffcf8a" />}
           </group>
@@ -158,11 +163,24 @@ export function LongCafeDressing({ def, wall }: { def: LayoutDef; wall: { a: { x
   const rotY = wall.face > 0 ? 0 : Math.PI;
   return (
     <group>
-      {/* green wainscot on the sign wall */}
-      <mesh position={[xmid, 0.5, wy - wall.face * 0.04]} rotation={[0, rotY, 0]}>
-        <planeGeometry args={[wallLen, 1]} />
-        <meshStandardMaterial color="#7a9a84" roughness={0.9} />
+      {/* sage-green wall behind the counter, as in the movie */}
+      <mesh position={[xmid, 1.4, wy - wall.face * 0.04]} rotation={[0, rotY, 0]}>
+        <planeGeometry args={[wallLen, 2.8]} />
+        <meshStandardMaterial color="#a9c38f" roughness={0.95} />
       </mesh>
+      {/* framed prints beside the menu */}
+      {[-1.4, -0.4, 4.3].map((dx, i) => (
+        <group key={dx} position={[xmid + dx, 1.9 + (i % 2) * 0.15, wy]} rotation={[0, rotY, 0]}>
+          <mesh>
+            <planeGeometry args={[0.5, 0.65]} />
+            <meshStandardMaterial color="#4a2e22" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0, 0.005]}>
+            <planeGeometry args={[0.42, 0.56]} />
+            <meshStandardMaterial color={['#d9603b', '#5d8fc9', '#e9c07a'][i]} roughness={0.9} />
+          </mesh>
+        </group>
+      ))}
       <mesh position={[xmid + 0.4, 2.45, wy]} rotation={[0, rotY, 0]}>
         <planeGeometry args={[3.4, 0.6]} />
         <meshStandardMaterial map={tex.sign} roughness={0.6} />

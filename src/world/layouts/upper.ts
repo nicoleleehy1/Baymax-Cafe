@@ -15,6 +15,8 @@ const mapper = (left: number, right: number, top: number, bottom: number) => (px
   v(x0 + ((py - top) / (bottom - top)) * Lx, y0 + ((px - left) / (right - left)) * Ly);
 
 const circ = (id: string, visual: CircleObstacle['visual'], c: Vec2, r: number, facing?: number): CircleObstacle => ({ kind: 'circle', id, visual, c, r, facing });
+/** rect of real size (sx along the building, sy across) centred on a world point */
+const box2 = (id: string, visual: RectObstacle['visual'], c: Vec2, sx: number, sy: number, facing?: number): RectObstacle => ({ kind: 'rect', id, visual, min: v(c.x - sx / 2, c.y - sy / 2), max: v(c.x + sx / 2, c.y + sy / 2), facing });
 const at = (c: Vec2, dx: number, dy: number): Vec2 => v(c.x + dx, c.y + dy);
 const outer = [
   { a: v(x0, y0), b: v(x1, y0), exterior: true },
@@ -92,11 +94,12 @@ const cassObstacles: Obstacle[] = [
   K2.rect('basin2', 'sink', 425, 655, 475, 720),
   K2.rect('toilet2', 'toilet', 385, 765, 445, 825, TO_LEFT),
   // dining
-  K2.rect('dining2', 'diningTable', 672, 920, 845, 1092),
-  circ('D1', 'chair', P2(758, 898), CHAIR_R, TO_FRONT),
-  circ('D2', 'chair', P2(758, 1114), CHAIR_R, TO_BACK),
-  circ('D3', 'chair', P2(648, 1006), CHAIR_R, TO_RIGHT),
-  circ('D4', 'chair', P2(868, 1006), CHAIR_R, TO_LEFT),
+  // dining set (the plan's table is drawn large; a real 1.2 m square leaves the living room walkable)
+  box2('dining2', 'diningTable', P2(758, 1006), 1.2, 1.2),
+  circ('D1', 'chair', at(P2(758, 1006), -0.85, 0), CHAIR_R, TO_FRONT),
+  circ('D2', 'chair', at(P2(758, 1006), 0.85, 0), CHAIR_R, TO_BACK),
+  circ('D3', 'chair', at(P2(758, 1006), 0, -0.85), CHAIR_R, TO_RIGHT),
+  circ('D4', 'chair', at(P2(758, 1006), 0, 0.85), CHAIR_R, TO_LEFT),
   // living room by the front bay
   K2.rect('sofa2a', 'sofa', 510, 1275, 625, 1420, TO_RIGHT),
   K2.rect('sofa2b', 'sofa', 640, 1292, 845, 1410, TO_BACK),
@@ -112,12 +115,8 @@ const cassObstacles: Obstacle[] = [
   K2.plant('pl2a', 298, 378, 0.24),
   K2.plant('pl2b', 530, 380, 0.26),
   K2.plant('pl2c', 545, 445, 0.2),
-  K2.plant('pl2d', 442, 892, 0.24),
-  K2.plant('pl2e', 838, 832, 0.3),
   K2.plant('pl2f', 905, 942, 0.26),
   K2.plant('pl2g', 905, 470, 0.22),
-  K2.plant('pl2h', 620, 1410, 0.22),
-  K2.plant('pl2i', 740, 1432, 0.26),
   K2.plant('pl2j', 822, 1400, 0.24),
   K2.plant('pl2k', 885, 1340, 0.28),
 ];
@@ -132,10 +131,10 @@ const cassDecor = [
 ];
 
 const dineSeats: Seat[] = [
-  { id: 'D1', pos: P2(758, 898), facing: TO_FRONT },
-  { id: 'D2', pos: P2(758, 1114), facing: TO_BACK },
-  { id: 'D3', pos: P2(648, 1006), facing: TO_RIGHT },
-  { id: 'D4', pos: P2(868, 1006), facing: TO_LEFT },
+  { id: 'D1', pos: at(P2(758, 1006), -0.85, 0), facing: TO_FRONT },
+  { id: 'D2', pos: at(P2(758, 1006), 0.85, 0), facing: TO_BACK },
+  { id: 'D3', pos: at(P2(758, 1006), 0, -0.85), facing: TO_RIGHT },
+  { id: 'D4', pos: at(P2(758, 1006), 0, 0.85), facing: TO_LEFT },
 ];
 const sofaA = P2(562, 1347);
 const sofaB = P2(742, 1351);
@@ -148,7 +147,7 @@ const bedC = P2(315, 1337);
 const DINE_C = P2(758, 1006);
 
 const cassTables: Table[] = [
-  { id: 'DIN', label: 'Dining table', c: DINE_C, seats: dineSeats, serve: at(P2(648, 1006), -0.1, -1.05) },
+  { id: 'DIN', label: 'Dining table', c: DINE_C, seats: dineSeats, serve: at(DINE_C, -1.1, -1.1) },
   { id: 'SOFA', label: 'Sofa by the window', c: sofaA, seats: sofaSeats, serve: at(sofaA, -1.55, 0) },
   { id: 'ARM', label: 'Second sofa', c: sofaB, seats: sofaBSeats, serve: at(sofaB, -1.5, 0) },
   { id: 'BED', label: 'Bedroom', c: bedC, seats: [{ id: 'BD', pos: at(bedC, 0.5, 0.2), facing: TO_RIGHT }], serve: at(bedC, -2.4, 0.2) },
@@ -216,7 +215,7 @@ const hiroWalls = [
 
 // robot parts on the floor: the bigger piles are obstacles, the rest is left as walkable clutter
 const parts3: CircleObstacle[] = [
-  [640, 790], [500, 1050], [680, 1185], [760, 1360],
+  [640, 790], [760, 1360],
 ].map(([px, py], i) => circ(`parts${i}`, 'parts', P3(px, py), 0.17));
 
 const hiroObstacles: Obstacle[] = [
@@ -226,13 +225,12 @@ const hiroObstacles: Obstacle[] = [
   K3.rect('roofStairs3', 'stairsUp', 470, 190, 590, 290),
   K3.rect('shed3', 'wardrobe', 590, 190, 790, 290),
   // garden
-  K3.rect('planter3a', 'planter', 305, 425, 490, 490),
-  K3.rect('planter3b', 'planter', 305, 540, 490, 600),
+  K3.rect('planter3a', 'planter', 345, 425, 490, 490),
+  K3.rect('planter3b', 'planter', 345, 540, 490, 600),
   K3.rect('planter3c', 'planter', 690, 395, 760, 530),
   K3.rect('nookGarden3', 'windowSeat', 760, 540, 798, 620),
-  K3.plant('bush3a', 230, 300, 0.34),
-  K3.plant('bush3b', 310, 250, 0.3),
-  K3.plant('bush3c', 400, 300, 0.34),
+  K3.plant('bush3b', 330, 230, 0.3),
+  K3.plant('bush3c', 430, 235, 0.34),
   K3.plant('bush3d', 600, 350, 0.3),
   K3.plant('bush3e', 730, 330, 0.3),
   K3.plant('bush3f', 700, 570, 0.3),
@@ -277,8 +275,8 @@ const hiroTables: Table[] = [
   { id: 'DESK', label: "Hiro's desk", c: deskC, seats: [{ id: 'DK', pos: P3(395, 1306), facing: TO_FRONT }], serve: at(P3(395, 1306), -1.15, 0.05) },
   { id: 'WORK', label: 'Workbench', c: benchC, seats: [{ id: 'WB', pos: at(benchC, 0.85, 0), facing: TO_BACK }], serve: at(benchC, 1.5, -0.1) },
   { id: 'HBED', label: "Tadashi's bed", c: bedRC, seats: [{ id: 'HB', pos: at(bedRC, -0.3, -0.5), facing: TO_LEFT }], serve: at(bedRC, -0.3, -2.3) },
-  { id: 'HBED2', label: "Hiro's bed", c: bedLC, seats: [{ id: 'HB2', pos: at(bedLC, -0.5, 0.35), facing: TO_RIGHT }], serve: at(bedLC, -1.95, 0.7) },
-  { id: 'GARDEN', label: 'Rooftop garden', c: P3(400, 460), seats: [], serve: P3(600, 440) },
+  { id: 'HBED2', label: "Hiro's bed", c: bedLC, seats: [{ id: 'HB2', pos: at(bedLC, -0.5, 0.35), facing: TO_RIGHT }], serve: at(bedLC, -1.3, 1.5) },
+  { id: 'GARDEN', label: 'Rooftop garden', c: P3(400, 460), seats: [], serve: P3(600, 450) },
 ];
 
 export const HIRO: LayoutDef = {

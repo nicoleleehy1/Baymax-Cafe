@@ -13,8 +13,8 @@ const START = { pos: PICKUP, heading: 0 };
 
 // TEACH: a pair chatting in the open floor past the counter, across the way to the window table
 // two friends chatting on the open floor by the front window, across the way to the bench
-const teachA = v(1.55, 3.75);
-const teachB = v(1.55, 1.45);
+const teachA = v(2.5, 3.64);
+const teachB = v(1.3, 1.56);
 
 const teach: Scenario = {
   id: 'teach',
@@ -36,8 +36,8 @@ const teach: Scenario = {
 
 // GENERALIZE: a different pair, by the window booths, on the way to Booth 1
 // a different pair, chatting in the gap between the booths and the communal table
-const genA = v(5.95, 0.2);
-const genB = v(5.95, -2.0);
+const genA = v(4.6, 0.1);
+const genB = v(4.6, -2.2);
 
 const generalize: Scenario = {
   id: 'generalize',
