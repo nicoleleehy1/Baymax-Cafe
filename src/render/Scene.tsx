@@ -26,8 +26,22 @@ import { SimDriver } from './SimDriver';
 const VIEW_DIR = LAYOUT_ID === 'classic' ? new THREE.Vector3(0.8, 9.2, 11.2) : new THREE.Vector3(0.0, 13.0, 12.5);
 const BUILDING_DIR = new THREE.Vector3(14, 16, 24);
 const DEFAULT_SHOT = { pos: VIEW_DIR.clone().normalize().multiplyScalar(19), target: new THREE.Vector3(0, 0, 0) };
-// screen region (NDC) the content should sit in: the toolbar takes the top ~7%, the cards the bottom ~17%
-const FRAME = { minX: -0.9, maxX: 0.9, minY: -0.66, maxY: 0.86 };
+type Frame = { minX: number; maxX: number; minY: number; maxY: number };
+
+/** Screen region (NDC) left free by the UI, measured from the DOM: below the toolbar (which can wrap to
+ *  two rows on narrow windows) and beside the intro card when there is room, else above it. */
+function freeFrame(w: number, h: number): Frame {
+  const top = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0;
+  const intro = document.querySelector('.intro')?.getBoundingClientRect();
+  const ny = (px: number) => 1 - (2 * px) / h;
+  const nx = (px: number) => (2 * px) / w - 1;
+  const f: Frame = { minX: nx(0.04 * w), maxX: nx(0.96 * w), minY: ny(h - 24), maxY: ny(top + 12) };
+  if (intro && intro.height > 0) {
+    if (w - intro.right > 0.5 * w) f.minX = nx(intro.right + 16); // room to the right of the card
+    else f.minY = ny(intro.top - 12); // narrow window: stay above the card
+  }
+  return f;
+}
 
 function boxCorners(min: THREE.Vector3, max: THREE.Vector3): THREE.Vector3[] {
   const out: THREE.Vector3[] = [];
@@ -52,7 +66,7 @@ function viewBox(building: boolean): THREE.Vector3[] {
 }
 
 /** Find target + camera position along `dir` so `pts` project inside FRAME (iterative; perspective-correct). */
-function fitShot(pts: THREE.Vector3[], dir: THREE.Vector3, cam: THREE.PerspectiveCamera): { pos: THREE.Vector3; target: THREE.Vector3 } {
+function fitShot(pts: THREE.Vector3[], dir: THREE.Vector3, cam: THREE.PerspectiveCamera, FRAME: Frame): { pos: THREE.Vector3; target: THREE.Vector3 } {
   const d = dir.clone().normalize();
   const target = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / pts.length);
   let dist = 20;
@@ -301,7 +315,7 @@ function CameraRig() {
   useEffect(() => {
     const ctl = controls.current;
     if (!ctl) return;
-    const fit = fitShot(viewBox(buildingView), buildingView ? BUILDING_DIR : VIEW_DIR, camera as THREE.PerspectiveCamera);
+    const fit = fitShot(viewBox(buildingView), buildingView ? BUILDING_DIR : VIEW_DIR, camera as THREE.PerspectiveCamera, freeFrame(size.width, size.height));
     let toP = fit.pos;
     let toT = fit.target;
     if (!buildingView && (runState === 'teaching' || runState === 'learning') && query?.query) {
@@ -331,7 +345,7 @@ function CameraRig() {
       }
     }
     anim.current = { fromP: camera.position.clone(), fromT: ctl.target.clone(), toP, toT, t: 0 };
-  }, [runState === 'teaching' || runState === 'learning', query, replayActive, buildingView, camera, size.width, size.height]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [runState === 'teaching' || runState === 'learning', runState === 'ready', query, replayActive, buildingView, camera, size.width, size.height]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame((_, dt) => {
     const a = anim.current;
