@@ -4,6 +4,7 @@ import { RoundedBox } from '@react-three/drei';
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Obstacle, RectObstacle } from '../world/layoutTypes';
+import { v } from '../core/vec';
 import { CHAIR_SEAT_Y, StoryChair, StoryTable, useFurnitureKit } from './Furniture';
 import { PALETTE, softMat } from './style/shapes';
 
@@ -35,6 +36,7 @@ function usePropMats() {
   );
 }
 
+const ORIENTED = new Set<RectObstacle['visual']>(['bed', 'sofa', 'armchair', 'desk', 'workbench', 'stove', 'kitchenette', 'toilet']);
 const mid = (o: RectObstacle) => ({ x: (o.min.x + o.max.x) / 2, z: (o.min.y + o.max.y) / 2, w: o.max.x - o.min.x, d: o.max.y - o.min.y });
 
 export function LongProps({ obstacles }: { obstacles: Obstacle[] }) {
@@ -102,7 +104,26 @@ export function LongProps({ obstacles }: { obstacles: Obstacle[] }) {
 }
 
 function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
-  const { x, z, w, d } = mid(o);
+  const g = mid(o);
+  // oriented props: the footprint stays axis-aligned, the prop turns inside it
+  if (o.facing !== undefined && ORIENTED.has(o.visual)) {
+    const quarter = Math.abs(Math.sin(o.facing)) > 0.5;
+    const inner: RectObstacle = {
+      ...o,
+      facing: undefined,
+      min: v(g.x - (quarter ? g.d : g.w) / 2, g.z - (quarter ? g.w : g.d) / 2),
+      max: v(g.x + (quarter ? g.d : g.w) / 2, g.z + (quarter ? g.w : g.d) / 2),
+    };
+    // default props face +x (bed head at +x, sofa back at +x, desk/bench front at +x)
+    return (
+      <group position={[g.x, 0, g.z]} rotation={[0, -o.facing, 0]}>
+        <group position={[-g.x, 0, -g.z]}>
+          <RectProp o={inner} m={m} />
+        </group>
+      </group>
+    );
+  }
+  const { x, z, w, d } = g;
   switch (o.visual) {
     case 'kitchenSink':
       return (
@@ -404,24 +425,38 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
         <group position={[x, 0, z]}>
           <RoundedBox args={[w, 0.3, d]} radius={0.04} position={[0, 0.15, 0]} material={m.woodDark} castShadow receiveShadow />
           <RoundedBox args={[w - 0.1, 0.2, d - 0.1]} radius={0.06} position={[0, 0.4, 0]} material={m.white} castShadow receiveShadow />
-          <RoundedBox args={[w * 0.6, 0.12, d - 0.14]} radius={0.05} position={[w * 0.15, 0.56, 0]} material={m.cushionAlt} castShadow receiveShadow />
-          <RoundedBox args={[0.3, 0.1, d * 0.3]} radius={0.04} position={[-w / 2 + 0.3, 0.55, 0]} material={m.cream} castShadow />
-          <mesh position={[-w / 2 + 0.05, 0.55, 0]} material={m.woodDark} castShadow>
+          <RoundedBox args={[w * 0.6, 0.12, d - 0.14]} radius={0.05} position={[-w * 0.15, 0.56, 0]} material={m.cushionAlt} castShadow receiveShadow />
+          {[-1, 1].map((sd) => (
+            <RoundedBox key={sd} args={[0.32, 0.1, Math.min(0.5, d * 0.36)]} radius={0.04} position={[w / 2 - 0.3, 0.55, (sd * d) / 4]} material={m.cream} castShadow />
+          ))}
+          <mesh position={[w / 2 - 0.05, 0.55, 0]} material={m.woodDark} castShadow>
             <boxGeometry args={[0.08, 0.9, d]} />
           </mesh>
         </group>
       );
     case 'sofa':
-    case 'armchair':
+    case 'armchair': {
+      const n = o.visual === 'armchair' ? 1 : Math.max(2, Math.round(d / 0.75));
       return (
         <group position={[x, 0, z]}>
-          <RoundedBox args={[w, 0.42, d]} radius={0.08} position={[0, 0.21, 0]} material={m.cushion} castShadow receiveShadow />
-          <RoundedBox args={[0.25, 0.45, d]} radius={0.08} position={[w / 2 - 0.12, 0.6, 0]} material={m.cushion} castShadow receiveShadow />
-          {[-1, 1].map((sd) => (
-            <RoundedBox key={sd} args={[w, 0.2, 0.2]} radius={0.06} position={[0, 0.5, (sd * (d - 0.2)) / 2]} material={m.cushion} castShadow />
+          <RoundedBox args={[w, 0.22, d]} radius={0.06} position={[0, 0.11, 0]} material={m.cushion} castShadow receiveShadow />
+          {Array.from({ length: n }).map((_, i) => (
+            <RoundedBox key={i} args={[w - 0.3, 0.18, d / n - 0.06]} radius={0.07} position={[-0.1, 0.3, -d / 2 + (i + 0.5) * (d / n)]} material={m.cushion} castShadow receiveShadow />
           ))}
+          <RoundedBox args={[0.26, 0.5, d]} radius={0.09} position={[w / 2 - 0.13, 0.55, 0]} material={m.cushion} castShadow receiveShadow />
+          {[-1, 1].map((sd) => (
+            <RoundedBox key={sd} args={[w - 0.1, 0.24, 0.2]} radius={0.08} position={[0, 0.45, (sd * (d - 0.2)) / 2]} material={m.cushion} castShadow />
+          ))}
+          {[-1, 1].flatMap((sx) =>
+            [-1, 1].map((sz) => (
+              <mesh key={`${sx}${sz}`} position={[(sx * (w - 0.14)) / 2, 0.035, (sz * (d - 0.14)) / 2]} material={m.woodDark}>
+                <cylinderGeometry args={[0.03, 0.03, 0.07, 10]} />
+              </mesh>
+            )),
+          )}
         </group>
       );
+    }
     case 'desk':
       return (
         <group position={[x, 0, z]}>
@@ -477,12 +512,23 @@ function RectProp({ o, m }: { o: RectObstacle; m: Mats }) {
     case 'tub':
       return (
         <group position={[x, 0, z]}>
-          <RoundedBox args={[w, 0.55, d]} radius={0.1} position={[0, 0.275, 0]} material={m.white} castShadow receiveShadow />
-          <mesh position={[0, 0.56, 0]} rotation={[-Math.PI / 2, 0, 0]} material={m.glass}>
+          <RoundedBox args={[w, 0.58, d]} radius={0.16} position={[0, 0.33, 0]} material={m.white} castShadow receiveShadow />
+          <RoundedBox args={[w - 0.22, 0.2, d - 0.22]} radius={0.1} position={[0, 0.55, 0]} material={m.darkSteel} />
+          <mesh position={[0, 0.6, 0]} rotation={[-Math.PI / 2, 0, 0]} material={m.glass}>
             <planeGeometry args={[w - 0.3, d - 0.3]} />
           </mesh>
-          <mesh position={[-w / 2 + 0.15, 0.75, 0]} material={m.steel}>
-            <cylinderGeometry args={[0.02, 0.02, 0.4, 10]} />
+          {[-1, 1].flatMap((sx) =>
+            [-1, 1].map((sz) => (
+              <mesh key={`${sx}${sz}`} position={[(sx * (w - 0.3)) / 2, 0.05, (sz * (d - 0.3)) / 2]} material={m.steel}>
+                <sphereGeometry args={[0.06, 10, 8]} />
+              </mesh>
+            )),
+          )}
+          <mesh position={[-w / 2 + 0.12, 0.78, 0]} material={m.steel}>
+            <cylinderGeometry args={[0.018, 0.018, 0.4, 10]} />
+          </mesh>
+          <mesh position={[-w / 2 + 0.12, 0.98, 0.06]} rotation={[0, 0, Math.PI / 2]} material={m.steel}>
+            <cylinderGeometry args={[0.014, 0.014, 0.16, 8]} />
           </mesh>
         </group>
       );

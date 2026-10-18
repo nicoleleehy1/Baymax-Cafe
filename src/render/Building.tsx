@@ -57,7 +57,7 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
         const dy = w.b.y - w.a.y;
         const L = Math.hypot(dx, dy);
         // dollhouse: the near (window) and front walls are kept low so the room stays open
-        const h = near(w) ? 0.35 : active ? 2.8 : 1.6;
+        const h = w.h ?? (near(w) ? 0.35 : active ? 2.8 : 1.6);
         return (
           <mesh key={i} position={[(w.a.x + w.b.x) / 2, h / 2, (w.a.y + w.b.y) / 2]} rotation={[0, -Math.atan2(dy, dx), 0]} material={mats.wall} castShadow receiveShadow>
             <boxGeometry args={[L + 0.15, h, 0.15]} />
@@ -70,6 +70,19 @@ function Storey({ def, active }: { def: LayoutDef; active: boolean }) {
           <meshStandardMaterial color="#c9a27a" roughness={1} />
         </mesh>
       )}
+      {def.decor?.map((d) => (
+        <Rug key={d.id} d={d} />
+      ))}
+      {def.windows?.map((w, i) => {
+        const dx = w.b.x - w.a.x;
+        const dy = w.b.y - w.a.y;
+        return (
+          <mesh key={`win${i}`} position={[(w.a.x + w.b.x) / 2, 1.5, (w.a.y + w.b.y) / 2]} rotation={[0, -Math.atan2(dy, dx), 0]}>
+            <planeGeometry args={[Math.hypot(dx, dy), 1.9]} />
+            <meshPhysicalMaterial color="#dff1f6" transparent opacity={0.35} roughness={0.05} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+        );
+      })}
       <LongProps obstacles={def.obstacles} />
       {!active && (
         // a soft veil so inactive storeys read as context, not as the stage
@@ -111,4 +124,49 @@ function makeFloorTexture(def: LayoutDef): THREE.CanvasTexture {
   const R = def.room;
   t.repeat.set((R.maxX - R.minX) / 4, (R.maxY - R.minY) / 4);
   return t;
+}
+
+function Rug({ d }: { d: NonNullable<LayoutDef['decor']>[number] }) {
+  const w = d.max.x - d.min.x;
+  const h = d.max.y - d.min.y;
+  const tex = useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d')!;
+    g.fillStyle = d.color ?? '#b5643f';
+    g.fillRect(0, 0, 128, 128);
+    if (d.kind !== 'tile') {
+      g.strokeStyle = 'rgba(255,255,255,0.35)';
+      g.lineWidth = 4;
+      g.strokeRect(10, 10, 108, 108);
+      g.strokeRect(24, 24, 80, 80);
+      g.fillStyle = 'rgba(255,255,255,0.25)';
+      g.beginPath();
+      g.moveTo(64, 34);
+      g.lineTo(94, 64);
+      g.lineTo(64, 94);
+      g.lineTo(34, 64);
+      g.closePath();
+      g.fill();
+    } else {
+      for (let i = 0; i < 4; i++)
+        for (let j = 0; j < 4; j++) {
+          g.fillStyle = (i + j) % 2 ? 'rgba(120,90,60,0.12)' : 'rgba(255,255,255,0.25)';
+          g.fillRect(i * 32, j * 32, 32, 32);
+        }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    if (d.kind === 'tile') {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(w / 1.2, h / 1.2);
+    }
+    return t;
+  }, [d, w, h]);
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(d.min.x + d.max.x) / 2, d.kind === 'tile' ? 0.004 : 0.012, (d.min.y + d.max.y) / 2]} receiveShadow>
+      {d.kind === 'roundRug' ? <circleGeometry args={[Math.min(w, h) / 2, 40]} /> : <planeGeometry args={[w, h]} />}
+      <meshStandardMaterial map={tex} roughness={1} />
+    </mesh>
+  );
 }

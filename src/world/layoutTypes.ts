@@ -2,7 +2,11 @@
 // serving positions, customer destinations and aisle annotations.
 import { pointSegment, v, type Vec2 } from '../core/vec';
 
-export const ROBOT_RADIUS = 0.52; // Baymax footprint: torso (0.445 max) and tray far edge (0.52) fit inside
+/** Baymax's planning footprint depends on what he carries: the café tray held out in front
+ *  (far edge 0.52 m) or a single cup held close to the chest at home (0.46 m). The torso
+ *  (0.445 m max) fits inside either. */
+export const ROBOT_RADIUS_TRAY = 0.52;
+export const ROBOT_RADIUS_CUP = 0.46;
 export const HUMAN_RADIUS = 0.25;
 
 export interface RectObstacle {
@@ -10,6 +14,8 @@ export interface RectObstacle {
   id: string;
   min: Vec2;
   max: Vec2;
+  /** prop orientation (quarter turns; the footprint stays axis-aligned). For beds: heading from foot to head. */
+  facing?: number;
   /** visual category used by the renderer */
   visual:
     | 'counter' | 'shelf' | 'pastryIsland' | 'staff' | 'kitchen' | 'galley' | 'bench' | 'booth' | 'communal' | 'restroom' | 'squareTable'
@@ -55,11 +61,17 @@ export interface LayoutDef {
   name: string;
   /** storey of the Lucky Cat building (1 = café); classic is a standalone café */
   floor: 1 | 2 | 3;
+  /** what Baymax carries here; sets his planning footprint and the carried prop */
+  carry?: 'tray' | 'cup';
   /** navigation grid bounds (may extend beyond the walls to an outdoor porch) */
   room: { minX: number; maxX: number; minY: number; maxY: number };
   wallClearance: (p: Vec2) => number;
-  /** wall polyline segments, for rendering and blockout drawing */
-  walls: { a: Vec2; b: Vec2 }[];
+  /** wall segments (navigation + rendering); `h` overrides the rendered height (screens, half walls) */
+  walls: { a: Vec2; b: Vec2; h?: number }[];
+  /** flat decoration that is walked over, not around (rugs) */
+  decor?: { id: string; kind: 'rug' | 'roundRug' | 'tile'; min: Vec2; max: Vec2; color?: string }[];
+  /** window openings drawn as glass on the outer wall */
+  windows?: { a: Vec2; b: Vec2 }[];
   obstacles: Obstacle[];
   tables: Table[];
   /** seats that are not at a Table (benches, booths) */

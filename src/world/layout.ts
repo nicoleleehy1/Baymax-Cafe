@@ -2,7 +2,7 @@
 // planner (as its map) and the renderer. Units are meters; floor plane uses (x, y=worldZ).
 // Select with ?layout=long|cass|hiro or ?floor=1|2|3 (browser), BAYMAX_LAYOUT=… (Node). Default: classic.
 import type { Vec2 } from '../core/vec';
-import { obstacleClearance, type LayoutDef, type Table } from './layoutTypes';
+import { obstacleClearance, ROBOT_RADIUS_CUP, ROBOT_RADIUS_TRAY, type LayoutDef, type Table } from './layoutTypes';
 import { CLASSIC } from './layouts/classic';
 import { LONG } from './layouts/long';
 import { CASS, HIRO } from './layouts/upper';
@@ -29,6 +29,8 @@ function pickLayout(): LayoutDef {
 
 export const LAYOUT: LayoutDef = pickLayout();
 export const LAYOUT_ID = LAYOUT.id;
+export const CARRY: 'tray' | 'cup' = LAYOUT.carry ?? 'tray';
+export const ROBOT_RADIUS = CARRY === 'cup' ? ROBOT_RADIUS_CUP : ROBOT_RADIUS_TRAY;
 export const ROOM = LAYOUT.room;
 export const TABLES = LAYOUT.tables;
 export const OBSTACLES = LAYOUT.obstacles;

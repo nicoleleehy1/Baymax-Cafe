@@ -49,6 +49,12 @@ function runUntil(c: Controller, w: FakeWorker, until: () => boolean, maxSteps =
   }
 }
 
+/** Advance until the controller posts a plan request (bounded). */
+function waitForRequest(c: Controller, w: FakeWorker): void {
+  for (let i = 0; i < 5000 && w.queue.length === 0; i++) c.advance(SIM_DT);
+  if (w.queue.length === 0) throw new Error('no plan request');
+}
+
 /** Advance until the next worker reply would carry a teaching query; return that undelivered reply. */
 function nextQueryReply(c: Controller, w: FakeWorker): FromWorker {
   for (let i = 0; i < 3000; i++) {
@@ -80,10 +86,11 @@ describe('delayed worker replies', () => {
 
   it('a plan scored with an outdated model revision is dropped', () => {
     const { c, w } = setup();
+    useApp.getState().set({ askEnabled: false }); // a teaching pause would stop plan requests
     c.start();
     runUntil(c, w, () => w.queue.length > 0 || c.engine.taskActive);
     runUntil(c, w, () => false, 5); // ensure a request is queued
-    while (w.queue.length === 0) c.advance(SIM_DT);
+    waitForRequest(c, w);
     const reply = w.take();
     c.resetPreferences(); // bumps model revision
     const before = c.dropped.plans;
@@ -93,12 +100,13 @@ describe('delayed worker replies', () => {
 
   it('an older plan arriving after a newer one is ignored', () => {
     const { c, w } = setup();
+    useApp.getState().set({ askEnabled: false });
     c.start();
-    while (!c.engine.taskActive) {
+    for (let i = 0; i < 5000 && !c.engine.taskActive; i++) {
       c.advance(SIM_DT);
       w.flush();
     }
-    while (w.queue.length === 0) c.advance(SIM_DT);
+    waitForRequest(c, w);
     const old = w.take();
     // no reply for > 1 s → controller supersedes the request
     for (let i = 0; i < 40; i++) c.advance(SIM_DT);

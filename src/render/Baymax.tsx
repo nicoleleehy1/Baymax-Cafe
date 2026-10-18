@@ -11,7 +11,7 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { wrapAngle, type Vec2 } from '../core/vec';
-import { TRAY_ENVELOPE } from '../world/robotBody';
+import { CARRY_ENVELOPE } from '../world/robotBody';
 import { headingToRotY } from './geom';
 import { PALETTE, limb, softMat, splineLathe } from './style/shapes';
 
@@ -51,7 +51,7 @@ const TORSO: [number, number][] = [
 ];
 const Z_SQUASH = 0.9;
 
-export const TRAY = TRAY_ENVELOPE;
+export const TRAY = CARRY_ENVELOPE;
 const SHOULDER = new THREE.Vector3(0.275, 1.17, 0.01);
 const UPPER = 0.27;
 const FORE = 0.26;
@@ -261,12 +261,16 @@ export function BaymaxModel({ source, ghost = false, tint, seed = 0 }: Props) {
       ))}
       {/* tray held in front of the chest, fully outside the torso */}
       <group ref={tray} position={[0, TRAY.y, TRAY.z]}>
-        <mesh material={mats.tray} castShadow receiveShadow>
-          <cylinderGeometry args={[TRAY.r, TRAY.r * 0.94, 0.018, 40]} />
-        </mesh>
-        <mesh position={[0, 0.012, 0]} rotation={[Math.PI / 2, 0, 0]} material={mats.trayRim}>
-          <torusGeometry args={[TRAY.r - 0.006, 0.007, 8, 40]} />
-        </mesh>
+        {TRAY.kind === 'tray' && (
+          <>
+            <mesh material={mats.tray} castShadow receiveShadow>
+              <cylinderGeometry args={[TRAY.r, TRAY.r * 0.94, 0.018, 40]} />
+            </mesh>
+            <mesh position={[0, 0.012, 0]} rotation={[Math.PI / 2, 0, 0]} material={mats.trayRim}>
+              <torusGeometry args={[TRAY.r - 0.006, 0.007, 8, 40]} />
+            </mesh>
+          </>
+        )}
         <group ref={cup} position={[0, 0.01, 0]}>
           <mesh position={[0, 0.004, 0]} material={mats.ceramic} castShadow>
             <cylinderGeometry args={[0.06, 0.055, 0.008, 28]} />
