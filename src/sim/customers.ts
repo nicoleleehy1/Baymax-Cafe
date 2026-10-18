@@ -41,6 +41,8 @@ export interface CustomerSpec {
   id: string;
   name: string;
   look: Look;
+  /** named cast member to render instead of a generic customer */
+  character?: 'cass' | 'hiro' | 'gogo' | 'wasabi' | 'honey' | 'fred';
   start: { pos: Vec2; facing: number; seated?: string };
   speed?: number;
   script: Action[];
@@ -227,6 +229,8 @@ export function stepCustomer(c: Customer, w: CustomerWorld): void {
       }
       case 'sit': {
         const seat = seatById(act.seat);
+        // a new seat elsewhere means getting up and walking there first
+        if (c.state === 'sitting' && dist(c.pos, seat.pos) > 0.2) c.state = 'walking';
         if (c.state !== 'sitting') {
           if (!pv.path) startWalk(c, seat.pos);
           c.state = 'walking';

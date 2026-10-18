@@ -7,7 +7,7 @@ import { controller } from '../state/controller';
 import { useApp } from '../state/store';
 import { OPTION_COLORS } from '../render/Teaching';
 import { REPLAY_COLORS } from '../render/Replay';
-import { TABLES } from '../world/layout';
+import { BUILDING, LAYOUT, LAYOUT_ID, TABLES } from '../world/layout';
 
 const fmt = (x: number, d = 2): string => (Math.abs(x) < 0.005 && d <= 2 ? '0' : x.toFixed(d));
 const signed = (x: number, d = 2): string => (x > 0.004 ? '+' : '') + fmt(x, d);
@@ -22,8 +22,9 @@ export function TopBar() {
   const evaluation = useApp((s) => s.evaluation);
   const examples = useApp((s) => s.model.examples.length);
   const phase = useApp((s) => s.hud.phase);
+  const buildingView = useApp((s) => s.buildingView);
   const set = useApp((s) => s.set);
-  const [table, setTable] = useState('T3');
+  const [table, setTable] = useState(LAYOUT.tables[0]?.id ?? 'T3');
 
   return (
     <header className="topbar">
@@ -34,6 +35,19 @@ export function TopBar() {
           <div className="brand-sub">Teaching Baymax consideration</div>
         </div>
       </div>
+      {LAYOUT_ID !== 'classic' && (
+        <nav className="scenarios floors" aria-label="Floor">
+          {BUILDING.map((def) => (
+            <a key={def.id} className={`tab ${def.id === LAYOUT_ID ? 'active' : ''}`} href={`?floor=${def.floor}`} title={def.name}>
+              <span className="tab-num">{def.floor}</span>
+              {def.floor === 1 ? 'Café' : def.floor === 2 ? 'Cass' : 'Hiro'}
+            </a>
+          ))}
+          <button className={`tab ${buildingView ? 'active' : ''}`} onClick={() => set({ buildingView: !buildingView })} title="Show the whole building">
+            Building
+          </button>
+        </nav>
+      )}
       <nav className="scenarios" aria-label="Scenario">
         {SCENARIO_ORDER.map((id, i) => (
           <button key={id} className={`tab ${id === scenarioId ? 'active' : ''}`} onClick={() => controller.loadScenario(id as ScenarioId)}>

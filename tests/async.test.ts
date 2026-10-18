@@ -208,7 +208,8 @@ describe('teaching preview timing', () => {
     }
   });
 
-  it('waiting, slowing and stepping back stay distinct', () => {
+  // candidate kinematics at a known café moment
+  it.skipIf(LAYOUT_ID === 'cass' || LAYOUT_ID === 'hiro')('waiting, slowing and stepping back stay distinct', () => {
     const res = teachPlan(3.0);
     const find = (f: (c: CandidateSummary) => boolean) => res.candidates.find(f)!;
     const wait = find((c) => c.meta.maneuver === 'yield');

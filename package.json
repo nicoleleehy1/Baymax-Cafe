@@ -12,7 +12,11 @@
     "typecheck": "tsc -b --noEmit",
     "eval:long": "BAYMAX_LAYOUT=long tsx src/eval/cli.ts",
     "test:long": "BAYMAX_LAYOUT=long vitest run",
-    "blockout": "BAYMAX_LAYOUT=long tsx src/eval/blockout.ts docs/blockout-long.svg"
+    "blockout": "BAYMAX_LAYOUT=long tsx src/eval/blockout.ts docs/blockout-long.svg",
+    "eval:cass": "BAYMAX_LAYOUT=cass tsx src/eval/cli.ts",
+    "test:cass": "BAYMAX_LAYOUT=cass vitest run",
+    "eval:hiro": "BAYMAX_LAYOUT=hiro tsx src/eval/cli.ts",
+    "test:hiro": "BAYMAX_LAYOUT=hiro vitest run"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

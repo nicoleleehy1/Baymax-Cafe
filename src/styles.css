@@ -171,3 +171,5 @@ table.metrics td:first-child { font-weight: 600; }
   .teach h2 { font-size: 16px; }
   .option { padding: 9px; }
 }
+
+.scenarios a.tab { text-decoration: none; }

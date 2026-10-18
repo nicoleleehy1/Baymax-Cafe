@@ -48,6 +48,8 @@ export interface AppState {
   /** teaching preview: pinned option (hover/selection) and comparison mode */
   previewFocus: 'A' | 'B' | null;
   previewCompare: boolean;
+  /** show every storey of the building (otherwise floors above the active one are hidden) */
+  buildingView: boolean;
   evidence: LearningEvidence | null;
   dialogue: DialogueLine[];
   hud: Hud;
@@ -71,6 +73,7 @@ export const useApp = create<AppState>((set) => ({
   query: null,
   previewFocus: null,
   previewCompare: false,
+  buildingView: false,
   evidence: null,
   dialogue: [],
   hud: { t: 0, phase: 'waiting', label: 'Waiting for an order', speed: 0, tableId: null, latencyMs: 0, replans: 0, noSafe: false, chosenDiffersFromInitial: false, initialChoiceLabel: null },

@@ -56,6 +56,24 @@ Requires Node 20.19+ (tested on Node 20.20). No external assets, network service
 
 ---
 
+## The Lucky Cat building (three floors)
+
+The café is the ground floor of a three-storey dollhouse, traced from the reference floor plan.
+Each storey is its own layout (`src/world/layouts/`): shared map data drives the navigation
+obstacles, the rendered props, the serving positions and the people's destinations.
+
+| Floor | URL | Layout | Scenarios |
+|---|---|---|---|
+| 1 | `/?floor=1` | Lucky Cat Café (kitchen, galley, L-shaped pastry counter, espresso bar, booths, communal table) | latte to the window bench, cocoa by the front window, a customer crossing from the restroom |
+| 2 | `/?floor=2` | Aunt Cass's apartment (kitchen + bay nook, bathroom, dining table, sofa cluster, bedroom) | cocoa to the sofa past Cass and Honey Lemon, tea to the bedroom past Go Go and Wasabi, Hiro crossing to the bedroom |
+| 3 | `/?floor=3` | Hiro's room + rooftop garden (planters, bathroom, desk, bed, workbench, robot parts) | gummy bears to the desk past Go Go and Wasabi, tea to the bed past Honey Lemon and Fred, Hiro dashing to the bathroom |
+
+The original square café is still available at `/?layout=classic`. The **Building** button shows
+all three storeys stacked (floors above the active one are otherwise hidden so nothing covers
+Baymax). Switching floors reloads the page; learned preferences persist in IndexedDB, so a lesson
+taught in the café carries upstairs. `npm run eval:long`, `eval:cass`, `eval:hiro` and the matching
+`test:*` scripts run the headless checks per floor.
+
 ## Architecture
 
 ```

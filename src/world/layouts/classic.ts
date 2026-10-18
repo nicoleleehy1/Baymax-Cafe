@@ -39,6 +39,7 @@ export const DOOR_RECT = { min: v(-7.6, 2.55), max: v(-7, 3.85) };
 export const CLASSIC: LayoutDef = {
   id: 'classic',
   name: 'Original café',
+  floor: 1,
   room: ROOM,
   wallClearance: (p) => {
     const inDoor = p.y > DOOR_RECT.min.y && p.y < DOOR_RECT.max.y;

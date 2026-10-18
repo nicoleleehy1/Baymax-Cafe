@@ -14,14 +14,16 @@ export interface RectObstacle {
   visual:
     | 'counter' | 'shelf' | 'pastryIsland' | 'staff' | 'kitchen' | 'galley' | 'bench' | 'booth' | 'communal' | 'restroom' | 'squareTable'
     | 'kitchenSink' | 'prepTable' | 'conveyorOven' | 'trayRack' | 'stairs' | 'office' | 'stove' | 'fridge' | 'dishRack'
-    | 'pastryCase' | 'dishCounter' | 'espressoBar' | 'boothTable';
+    | 'pastryCase' | 'dishCounter' | 'espressoBar' | 'boothTable'
+    | 'bed' | 'sofa' | 'armchair' | 'desk' | 'workbench' | 'planter' | 'tub' | 'toilet' | 'sink' | 'diningTable' | 'kitchenette'
+    | 'windowSeat' | 'wardrobe' | 'clutter' | 'bookshelf' | 'rug' | 'stairsUp' | 'landing';
 }
 export interface CircleObstacle {
   kind: 'circle';
   id: string;
   c: Vec2;
   r: number;
-  visual: 'table' | 'chair' | 'plant' | 'post';
+  visual: 'table' | 'chair' | 'plant' | 'post' | 'stool' | 'pouf' | 'parts';
   /** chair facing angle (radians, floor plane) */
   facing?: number;
 }
@@ -49,8 +51,10 @@ export interface AisleZone {
 }
 
 export interface LayoutDef {
-  id: 'classic' | 'long';
+  id: 'classic' | 'long' | 'cass' | 'hiro';
   name: string;
+  /** storey of the Lucky Cat building (1 = café); classic is a standalone café */
+  floor: 1 | 2 | 3;
   /** navigation grid bounds (may extend beyond the walls to an outdoor porch) */
   room: { minX: number; maxX: number; minY: number; maxY: number };
   wallClearance: (p: Vec2) => number;

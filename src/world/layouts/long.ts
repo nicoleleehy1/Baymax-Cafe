@@ -222,7 +222,8 @@ void KITCHEN_WALL_Y_END;
 
 export const LONG: LayoutDef = {
   id: 'long',
-  name: 'Lucky Cat Café (plan)',
+  name: 'Lucky Cat Café',
+  floor: 1,
   room: { minX: x0, maxX: x1 + 1.2, minY: y0, maxY: y1 + 1.2 },
   wallClearance: polygonWallClearance([boundary, porch], walls),
   walls,

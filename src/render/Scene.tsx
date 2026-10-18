@@ -8,8 +8,9 @@ import { angleOf, sub } from '../core/vec';
 import { SCENARIOS } from '../sim/scenarios';
 import { controller } from '../state/controller';
 import { useApp } from '../state/store';
-import { AUNT_CASS, LAYOUT_ID, tableById } from '../world/layout';
-import { LongBlockout } from './LongBlockout';
+import { AUNT_CASS, FLOOR_HEIGHT, LAYOUT, LAYOUT_ID, tableById } from '../world/layout';
+import { Building } from './Building';
+import { CAST, CharacterModel } from './characters';
 import { BaymaxModel, type BaymaxPose } from './Baymax';
 import { Cafe } from './Cafe';
 import { lerpAngle } from './geom';
@@ -19,11 +20,16 @@ import { ReplayScene } from './Replay';
 import { TeachingPreview } from './Teaching';
 import { SimDriver } from './SimDriver';
 
-// dollhouse framing per layout: the long café is viewed from its cut-away window side
+// dollhouse framing per layout: the building is viewed from its cut-away window side
 const DEFAULT_SHOT =
-  LAYOUT_ID === 'long'
-    ? { pos: new THREE.Vector3(0.0, 15.5, 12.5), target: new THREE.Vector3(0.0, 0, 0.6) }
-    : { pos: new THREE.Vector3(1.0, 9.2, 11.6), target: new THREE.Vector3(0.2, 0, 0.4) };
+  LAYOUT_ID === 'classic'
+    ? { pos: new THREE.Vector3(1.0, 9.2, 11.6), target: new THREE.Vector3(0.2, 0, 0.4) }
+    : { pos: new THREE.Vector3(0.0, 15.5, 12.5), target: new THREE.Vector3(0.0, 0, 0.6) };
+// whole-building shot: pull back and aim at the middle of the stack (active floor is y = 0)
+const BUILDING_SHOT = (() => {
+  const mid = (2 - LAYOUT.floor) * FLOOR_HEIGHT;
+  return { pos: new THREE.Vector3(14, mid + 16, 24), target: new THREE.Vector3(0, mid, 0) };
+})();
 
 export function Scene() {
   return (
@@ -39,7 +45,7 @@ export function Scene() {
     >
       <SimDriver />
       <Lights />
-      {LAYOUT_ID === 'long' ? <LongBlockout /> : <Cafe />}
+      {LAYOUT_ID === 'classic' ? <Cafe /> : <Building />}
       <World />
       <CameraRig />
     </Canvas>
@@ -60,7 +66,7 @@ function Lights() {
       <ambientLight intensity={0.18} color="#ffd9a8" />
       <directionalLight
         ref={sun}
-        position={LAYOUT_ID === 'long' ? [3, 10, 9] : [13, 8.5, 1.5]}
+        position={LAYOUT_ID === 'classic' ? [13, 8.5, 1.5] : [3, 10, 9]}
         intensity={3.1}
         color="#ffdcae"
         castShadow
@@ -100,10 +106,15 @@ function World() {
   }
   return (
     <>
-      {scenario.customers.map((c, i) => (
-        <PersonModel key={`${scenarioId}-${c.id}`} look={c.look} source={liveHuman(c.id)} seed={i} />
-      ))}
-      <AuntCass />
+      {scenario.customers.map((c, i) => {
+        const spec = c.character ? CAST_BY_ID[c.character] : undefined;
+        return spec ? (
+          <CharacterModel key={`${scenarioId}-${c.id}`} spec={spec} source={liveHuman(c.id)} seed={i} />
+        ) : (
+          <PersonModel key={`${scenarioId}-${c.id}`} look={c.look} source={liveHuman(c.id)} seed={i} />
+        );
+      })}
+      {!scenario.customers.some((c) => c.character === 'cass') && <AuntCass />}
       <BaymaxModel source={liveRobotUnlessPreviewing} />
       <DeliveredCup />
       <ChatBubbles groups={scenario.groups.map((g) => g.id)} />
@@ -147,6 +158,15 @@ const liveHuman = (id: string) => (): PersonPose => {
     gait: fa.gait + (fb.gait - fa.gait) * f,
     visible: fb.visible,
   };
+};
+
+const CAST_BY_ID: Record<string, (typeof CAST)[number]> = {
+  cass: CAST[0],
+  hiro: CAST[1],
+  gogo: CAST[2],
+  wasabi: CAST[3],
+  honey: CAST[4],
+  fred: CAST[5],
 };
 
 const CASS_LOOK = { shirt: '#5a7fb5', pants: '#3d3a46', skin: '#f2c9a8', hair: '#7a4b2a', hairStyle: 'bun' as const, height: 0.98 };
@@ -221,14 +241,15 @@ function CameraRig() {
   const runState = useApp((s) => s.runState);
   const query = useApp((s) => s.query);
   const replayActive = useApp((s) => s.replayActive);
+  const buildingView = useApp((s) => s.buildingView);
   const anim = useRef<{ fromP: THREE.Vector3; fromT: THREE.Vector3; toP: THREE.Vector3; toT: THREE.Vector3; t: number } | null>(null);
 
   useEffect(() => {
     const ctl = controls.current;
     if (!ctl) return;
-    let toP = DEFAULT_SHOT.pos.clone();
-    let toT = DEFAULT_SHOT.target.clone();
-    if ((runState === 'teaching' || runState === 'learning') && query?.query) {
+    let toP = (buildingView ? BUILDING_SHOT : DEFAULT_SHOT).pos.clone();
+    let toT = (buildingView ? BUILDING_SHOT : DEFAULT_SHOT).target.clone();
+    if (!buildingView && (runState === 'teaching' || runState === 'learning') && query?.query) {
       const a = query.candidates[query.query.a];
       const b = query.candidates[query.query.b];
       const pts = [...a.pts, ...a.tail, ...b.pts, ...b.tail];
@@ -255,7 +276,7 @@ function CameraRig() {
       }
     }
     anim.current = { fromP: camera.position.clone(), fromT: ctl.target.clone(), toP, toT, t: 0 };
-  }, [runState === 'teaching' || runState === 'learning', query, replayActive, camera]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [runState === 'teaching' || runState === 'learning', query, replayActive, buildingView, camera]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame((_, dt) => {
     const a = anim.current;
@@ -276,7 +297,7 @@ function CameraRig() {
       enableDamping
       dampingFactor={0.08}
       minDistance={4}
-      maxDistance={22}
+      maxDistance={40}
       maxPolarAngle={Math.PI / 2.25}
       target={DEFAULT_SHOT.target.toArray()}
     />
