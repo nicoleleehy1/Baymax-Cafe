@@ -11,6 +11,12 @@ his later decisions in new situations change because of it.
 "Socially aware" here means *his trajectory scoring accounts for people's comfort*. It does not
 mean sentience or perception: conversation groups are authored scene annotations.
 
+<img width="2668" height="1658" alt="FB4AE302-23EC-496E-82D9-B5B34BA6F23B" src="https://github.com/user-attachments/assets/7d432c7a-db94-458a-845f-f3b79ea6d477" />
+<img width="2662" height="1654" alt="8D1674DF-75C6-4C2A-A4EB-4EDFF8BF2EA9" src="https://github.com/user-attachments/assets/00668511-e5c4-4377-9d5c-c04262e4dc17" />
+<img width="2670" height="1654" alt="A0E295C2-5479-49CE-8607-26B23DC7C001" src="https://github.com/user-attachments/assets/a061987d-dcec-4ca6-bcc1-b074bf017707" />
+<img width="2668" height="1658" alt="47B4F76F-D100-41E7-8944-D359EE93DBC2" src="https://github.com/user-attachments/assets/d3ed85ec-3830-4e97-980b-6e3d3308c229" />
+
+
 ---
 
 ## Run it
