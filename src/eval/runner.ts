@@ -1,7 +1,7 @@
 // Headless, deterministic episodes: the same planner code as the interactive app, run in
 // lock-step (plan → apply → step) so results are repeatable.
 import type { PlanResult, PreferenceExample } from '../core/types';
-import { plan } from '../planning/planner';
+import { plan, type PlanInput } from '../planning/planner';
 import { recordCustomerTrack, SimEngine, type CustomerTrack } from '../sim/engine';
 import type { Frame, Metrics } from '../sim/metrics';
 import { SCENARIOS, type ScenarioId } from '../sim/scenarios';
@@ -14,6 +14,8 @@ export interface EpisodeOptions {
   onQuery?: (res: PlanResult, engine: SimEngine) => number[] | null;
   allowQuery?: boolean;
   maxQueries?: number;
+  /** scorer to plan with (defaults to the linear-weight planner); the neural reward model plugs in here */
+  planner?: (input: PlanInput) => PlanResult;
 }
 
 export interface EpisodeResult {
@@ -39,11 +41,12 @@ export function runEpisode(scenarioId: ScenarioId, o: EpisodeOptions): EpisodeRe
   let planCount = 0;
   let queries = 0;
   let lastQueryT = -Infinity;
+  const planFn = o.planner ?? plan;
   while (!eng.finished) {
     if (eng.needsPlan()) {
       eng.markPlanRequested();
       const allowQuery = !!o.allowQuery && queries < (o.maxQueries ?? 1) && eng.t - lastQueryT > 15;
-      const res = plan({
+      const res = planFn({
         reqId: eng.nextReqId(),
         epoch: eng.epoch,
         obs: eng.observe(),
@@ -61,7 +64,7 @@ export function runEpisode(scenarioId: ScenarioId, o: EpisodeOptions): EpisodeRe
         if (nw) {
           weights = nw;
           // replan immediately with the updated model, from the same state
-          const res2 = plan({ reqId: eng.nextReqId(), epoch: eng.epoch, obs: eng.observe(), weights, initialWeights: o.initialWeights, prev: eng.prevMeta, stuckFor: eng.robot.stuckFor, allowQuery: false });
+          const res2 = planFn({ reqId: eng.nextReqId(), epoch: eng.epoch, obs: eng.observe(), weights, initialWeights: o.initialWeights, prev: eng.prevMeta, stuckFor: eng.robot.stuckFor, allowQuery: false });
           eng.applyPlan(res2);
           track2(res2);
         } else {

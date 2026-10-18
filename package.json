@@ -18,7 +18,10 @@
     "eval:hiro": "BAYMAX_LAYOUT=hiro tsx src/eval/cli.ts",
     "test:hiro": "BAYMAX_LAYOUT=hiro vitest run",
     "eval:transfer": "tsx src/eval/transfer.ts",
-    "eval:all": "npm run eval && npm run eval:long && npm run eval:cass && npm run eval:hiro && npm run eval:transfer"
+    "eval:all": "npm run eval && npm run eval:long && npm run eval:cass && npm run eval:hiro && npm run eval:transfer",
+    "neural:collect": "for l in classic long cass hiro; do BAYMAX_LAYOUT=$l tsx src/learning/neural/collect.ts 16 || exit 1; done",
+    "neural:train": "npm run neural:collect && tsx src/learning/neural/train.ts",
+    "eval:neural": "npm run neural:collect && tsx src/learning/neural/evalAll.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
