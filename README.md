@@ -190,6 +190,34 @@ to a crossing person comes from prediction plus collision rejection, not from th
 Hard-brake events were 0 in all runs. Metric definitions are in `src/sim/metrics.ts` and are
 shown as tooltips in the app.
 
+### Training on every floor (verified 2026-10-18)
+
+Each storey has its own teach / generalize / adapt scenarios and the same planner and
+preference model. The loop was run end to end in a real browser (production build,
+Playwright driving the actual UI, metrics read from the running simulation):
+
+| Step | What happened | Delivered | Intrusions | Min clearance | Collisions |
+|---|---|---|---|---|---|
+| Café · Teach | asked "pass between them, or go around?"; chose *go around*; conversation weight 0.15 → 1.66, P(choice) 25 % → 83 % | 14.2 s | 0 | 0.17 m | 0 |
+| Café · Generalize | no question; "scenic route" chosen from the learned scoring | 14.7 s | 0 | 0.31 m | 0 |
+| Cass's floor · Generalize | **no teaching on this floor**; the café lesson carried over (IndexedDB) | 19.5 s | 0 | 0.08 m | 0 |
+| Hiro's floor · Generalize | **no teaching on this floor**; café lesson carried over | 12.2 s | 0 | 0.58 m | 0 |
+| Cass's floor · Adapt | "After you." — waited for Cass, then continued | 13.7 s | 0 | 0.25 m | 0 |
+| Hiro's floor · Adapt | waited for Hiro's dash to the bathroom, then continued | 10.5 s | 0 | 0.40 m | 0 |
+| Cass's floor · Teach (fresh model) | conversation 0.15 → 1.90, P(choice) 25 % → 81 % | 15.6 s | 0 | 0.29 m | 0 |
+| Hiro's floor · Teach | asked again with the model already taught; P 76 % → 87 % | 11.5 s | 0 | 0.32 m | 0 |
+
+Headless, `npm run eval:transfer` teaches once on the café and applies the untouched weights to
+every other floor: conversation intrusions go 1 → 0 on the classic café, Cass's floor and Hiro's
+floor, with no collisions. The "before" runs with the initial weights intrude on every floor, so the
+change is the learned scoring, not the layout. `npm run eval:all` runs every floor's evaluation
+plus the transfer check.
+
+Honest notes from these runs: the model also picks up incidental correlations of the chosen
+option (speed near people and abrupt motion moved along with conversation intrusion); upstairs
+Baymax carries a cup (0.46 m footprint) instead of the tray, and the apartment's narrow spots
+still produce low clearances (0.08 m on Cass's floor) without contact.
+
 ### Verification (`npm test`)
 
 - A preference update raises P(preferred) above 0.5, re-ranks the pair, and increases the

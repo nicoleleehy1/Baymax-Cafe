@@ -16,7 +16,9 @@
     "eval:cass": "BAYMAX_LAYOUT=cass tsx src/eval/cli.ts",
     "test:cass": "BAYMAX_LAYOUT=cass vitest run",
     "eval:hiro": "BAYMAX_LAYOUT=hiro tsx src/eval/cli.ts",
-    "test:hiro": "BAYMAX_LAYOUT=hiro vitest run"
+    "test:hiro": "BAYMAX_LAYOUT=hiro vitest run",
+    "eval:transfer": "tsx src/eval/transfer.ts",
+    "eval:all": "npm run eval && npm run eval:long && npm run eval:cass && npm run eval:hiro && npm run eval:transfer"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
